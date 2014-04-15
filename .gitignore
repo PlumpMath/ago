@@ -1,8 +1,10 @@
 /target
 /classes
 /checkouts
+/out
 pom.xml
 pom.xml.asc
+rewindable.js
 *.jar
 *.class
 /.lein-*
