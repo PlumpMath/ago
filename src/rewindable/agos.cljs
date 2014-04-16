@@ -23,6 +23,7 @@
                               ^not-native buf ^:mutable closed]
   protocols/WritePort
   (put! [this val ^not-native handler]
+    (println :MMMChannel :put this val handler)
     (assert (not (nil? val)) "Can't put nil in on a channel")
     ;; bug in CLJS compiler boolean inference - David
     (let [^boolean closed closed]
@@ -58,6 +59,7 @@
 
   protocols/ReadPort
   (take! [this ^not-native handler]
+    (println :MMMChannel :take this handler)
     (if (not ^boolean (protocols/active? handler))
       nil
       (if (and (not (nil? buf)) (pos? (count buf)))
@@ -104,6 +106,7 @@
   protocols/Channel
   (closed? [_] closed)
   (close! [this]
+    (println :MMMChannel :close this)
     (if ^boolean closed
         nil
         (do (set! closed true)
@@ -117,6 +120,7 @@
             nil))))
 
 (defn chan-buf [buf]
+  (println :chan-buf buf)
   (MyManyToManyChannel. (buffers/ring-buffer 32) 0
                         (buffers/ring-buffer 32) 0
                         buf false))

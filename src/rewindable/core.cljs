@@ -1,9 +1,6 @@
 (ns rewindable.core
   (:require-macros [rewindable.ago :refer [my-go]])
-  (:require [clojure.string :as string]
-            [cljs.core.async :refer [chan <! >! put! close! timeout merge
-                                     map< filter< sliding-buffer]]
-            [cljs.core.async.impl.ioc-helpers]
+  (:require [cljs.core.async :refer [<! put!]]
             [rewindable.agos]
             [goog.dom :as gdom]
             [goog.events :as gevents]))
@@ -11,7 +8,7 @@
 (enable-console-print!)
 
 (defn listen-el [el type]
-  (let [out (chan)]
+  (let [out (rewindable.agos/chan)]
     (gevents/listen el type #(put! out %))
     out))
 
