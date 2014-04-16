@@ -26,7 +26,7 @@
 ; From https://github.com/clojure/core.async/blob/master/src/main/clojure/cljs/core/async/macros.clj
 (defmacro my-go [& body]
   (let [sm (ioc/state-machine body 1 &env my-async-terminators)]
-    `(let [c# (cljs.core.async/chan 1)]
+    `(let [c# (rewindable.agos/chan 1)]
        (cljs.core.async.impl.dispatch/run
         (fn []
           (let [sm# ~sm
