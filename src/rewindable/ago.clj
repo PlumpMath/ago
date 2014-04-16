@@ -21,7 +21,7 @@
     `(let [c# (cljs.core.async/chan 1)]
        (cljs.core.async.impl.dispatch/run
         (fn []
-          (let [f# ~x
+          (let [f# ~sm
                 state# (-> (f#)
                            (ioc/aset-all! cljs.core.async.impl.ioc-helpers/USER-START-IDX c#))]
             (cljs.core.async.impl.ioc-helpers/run-state-machine-wrapped state#))))
