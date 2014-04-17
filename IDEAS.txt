@@ -1,0 +1,74 @@
+goroutines have state,
+  which might reference...
+    chan's,
+    closures (which hide chan's),
+    atoms,
+    and other immutable data.
+  so goroutines, chans, Handlers and atoms need to be registered with the world.
+
+dispatcher task queue might also have state (thunks),
+  so callback thunks need to check for world branching.
+
+chan's have state
+  but only in either the buf (vals) or the ring-buffers (waiting takers or putters)
+    so can force agoroutines to use special, persistent, world-aware
+    buf's and ring-buffers
+
+the ring-buffers are holding opaque thunks (Handler's) which
+  in turn are holding state-machine arrays.
+
+if we rewind the world, some Handlers and some state-machines
+  might be refering to state-machines and chans that
+    *should not exist* (perhaps yet).
+  so...
+    need to all Handers/thunks need to check if they're obsoleted.
+  and, I don't think we need to proactively empty or
+    clear the buffers of all pre-born chan's and close them
+    as we'll rely on GC.
+
+timer channels
+  there's a global timeouts-map
+  so...
+    need our own timeouts-map per world?
+    and when world is rewound, need to rewind time and all those timeouts.
+    and need to ignore any late firings from previous worlds.
+
+CHALLENGE
+  want to have interop between regular goroutines and agoroutines
+  regular goroutine puts or takes from/to a rewindable channel:
+    but the regular goroutine is then parked,
+    and, when the world rewinds,
+      it's possible the regular goroutine gets "stuck" waiting forever,
+    so...
+      we'll only carefully allow interop on channels that never close?
+  a rewindable "agoroutine" puts or takes from/to a regular channel:
+    but that rewindable agoroutine gets parked,
+    and, when the world rewinds,
+      the reactivated (but now outdated) agoroutine needs to check
+      the world ID and turn itself into a NO-OP.
+
+a parked goroutine might be trying to build up a new atom state,
+  and when it unparks after a rewind, it completes some codepath
+  and tries to swap in some (now) incorrect state.
+  so, we can't allow any old goroutines to successfully unpark.
+
+world
+  unique world ID
+  current
+    goroutine state machines
+    atoms
+    buffers
+    ring-buffers
+    timers
+
+  snapshots
+    snapshot
+    snapshot
+    snapshot
+      goroutine state machines
+      atoms
+      buffers
+      ring-buffers
+      timers
+
+
