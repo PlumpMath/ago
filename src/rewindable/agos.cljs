@@ -80,9 +80,3 @@
   (println :agos-return-chan (sstate state) value)
   (cljs.core.async.impl.ioc-helpers/return-chan state value))
 
-(defn agos-chan [buf]
-  (println :agos-chan buf)
-  (channels/ManyToManyChannel. (uverse-buf (make-uverse)) 0
-                               (uverse-buf (make-uverse)) 0
-                               buf false))
-
