@@ -14,16 +14,16 @@
 
 ; Persistent buffer implementation as an alternative to
 ; CLJS/core.async's default mutable RingBuffer.
-(deftype UverseBuf [uverse buf-id ^:mutable length]
+(deftype FifoQueue [ago-world buf-id ^:mutable length]
   Object
   (pop [_]
-    (when-let [x (last (get-in @uverse [:bufs buf-id]))]
-      (swap! uverse #(update-in % [:bufs buf-id] drop-last))
+    (when-let [x (last (get-in @ago-world [:bufs buf-id]))]
+      (swap! ago-world #(update-in % [:bufs buf-id] drop-last))
       (set! length (dec length))
       x))
 
   (unshift [_ x]
-    (swap! uverse #(update-in % [:bufs buf-id] conj x))
+    (swap! ago-world #(update-in % [:bufs buf-id] conj x))
     (set! length (inc length))
     nil)
 
@@ -33,18 +33,18 @@
   (resize [_] nil) ; From RingBuffer 'interface'.
 
   (cleanup [_ keep?]
-    (swap! uverse #(update-in % [:bufs buf-id] (fn [xs] (filter keep? xs))))
-    (set! length (count (get-in @uverse [:bufs buf-id])))))
+    (swap! ago-world #(update-in % [:bufs buf-id] (fn [xs] (filter keep? xs))))
+    (set! length (count (get-in @ago-world [:bufs buf-id])))))
 
-(defn uverse-buf [uverse]
-  (UverseBuf. uverse ((:gen-id @uverse)) 0))
+(defn fifo-queue [ago-world]
+  (FifoQueue. ago-world ((:gen-id @ago-world)) 0))
 
 ; --------------------------------------------------------
 
 (defn chan-buf [buf]
   (println :chan-buf buf)
-  (channels/ManyToManyChannel. (uverse-buf (make-ago-world)) 0
-                               (uverse-buf (make-ago-world)) 0
+  (channels/ManyToManyChannel. (fifo-queue (make-ago-world)) 0
+                               (fifo-queue (make-ago-world)) 0
                                buf false))
 
 (defn chan
@@ -61,22 +61,19 @@
 
 ; --------------------------------------------------------
 
-(defn sstate [state]
-  (println (rest state)))
-
 (defn ago-take [state blk ^not-native c]
-  (println :ago-take (sstate state) blk c)
+  (println :ago-take (rest state) blk c)
   (cljs.core.async.impl.ioc-helpers/take! state blk c))
 
 (defn ago-put [state blk ^not-native c val]
-  (println :ago-put (sstate state) blk c val)
+  (println :ago-put (rest state) blk c val)
   (cljs.core.async.impl.ioc-helpers/put! state blk c val))
 
 (defn ago-alts [state cont-block ports & rest]
-  (println :ago-alts (sstate state) cont-block ports rest)
+  (println :ago-alts (rest state) cont-block ports rest)
   (apply cljs.core.async.impl.ioc-helpers/ioc-alts! state cont-block ports rest))
 
 (defn ago-return-chan [state value]
-  (println :ago-return-chan (sstate state) value)
+  (println :ago-return-chan (rest state) value)
   (cljs.core.async.impl.ioc-helpers/return-chan state value))
 
