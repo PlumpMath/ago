@@ -12,19 +12,19 @@
     (atom {:gen-id #(swap! last-id inc)
            :bufs {}})))
 
-; Persistent buffer implementation as an alternative to
-; CLJS/core.async's default mutable RingBuffer.
-(deftype FifoQueue [ago-world buf-id ^:mutable length]
+; Persistent/immutable buffer implementation as an alternative to
+; CLJS/core.async's default mutable RingBuffer, so that we can easily
+; take ago-world snapshots.  Note: we have an unused length property
+; in order to keep ManyToManyChannel happy.
+(deftype FifoBuffer [ago-world buf-id length max-length]
   Object
   (pop [_]
     (when-let [x (last (get-in @ago-world [:bufs buf-id]))]
       (swap! ago-world #(update-in % [:bufs buf-id] drop-last))
-      (set! length (dec length))
       x))
 
   (unshift [_ x]
     (swap! ago-world #(update-in % [:bufs buf-id] conj x))
-    (set! length (inc length))
     nil)
 
   (unbounded-unshift [this x] ; From RingBuffer 'interface'.
@@ -33,31 +33,45 @@
   (resize [_] nil) ; From RingBuffer 'interface'.
 
   (cleanup [_ keep?]
-    (swap! ago-world #(update-in % [:bufs buf-id] (fn [xs] (filter keep? xs))))
-    (set! length (count (get-in @ago-world [:bufs buf-id])))))
+    (swap! ago-world #(update-in % [:bufs buf-id] (fn [xs] (filter keep? xs)))))
 
-(defn fifo-queue [ago-world]
-  (FifoQueue. ago-world ((:gen-id @ago-world)) 0))
+  protocols/Buffer
+  (full? [this]
+    (and (>= max-length 0)
+         (>= (.count this) max-length)))
+  (remove! [this]
+    (.pop this))
+  (add! [this itm]
+    (assert (not (.full? this)) "Can't add to a full FifoBuffer")
+    (.unshift this itm))
+
+  cljs.core/ICounted
+  (-count [this]
+    (count (get-in @ago-world [:bufs buf-id]))))
+
+(defn fifo-buffer [ago-world max-length]
+  (FifoBuffer. ago-world ((:gen-id @ago-world)) 0 max-length))
 
 ; --------------------------------------------------------
 
-(defn chan-buf [buf]
-  (println :chan-buf buf)
-  (channels/ManyToManyChannel. (fifo-queue (make-ago-world)) 0
-                               (fifo-queue (make-ago-world)) 0
+(defn ago-world-chan-buf [ago-world buf]
+  (println :ago-world-chan-buf buf)
+  (channels/ManyToManyChannel. (fifo-buffer ago-world -1) 0
+                               (fifo-buffer ago-world -1) 0
                                buf false))
 
-(defn chan
-  "Creates a channel with an optional buffer. If buf-or-n is a number,
-  will create and use a fixed buffer of that size."
-  ([] (chan nil))
-  ([buf-or-n]
+(defn ago-world-chan
+  "Creates a channel with an optional buffer. If buf-or-n is a
+  number, will create and use a buffer with that max-length."
+  ([ago-world] (ago-world-chan ago-world nil))
+  ([ago-world buf-or-n]
      (let [buf-or-n (if (= buf-or-n 0)
                       nil
                       buf-or-n)]
-       (chan-buf (if (number? buf-or-n)
-                   (buffers/fixed-buffer buf-or-n)
-                   buf-or-n)))))
+       (ago-world-chan-buf ago-world
+                           (if (number? buf-or-n)
+                             (fifo-buffer ago-world buf-or-n)
+                             buf-or-n)))))
 
 ; --------------------------------------------------------
 

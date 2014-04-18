@@ -24,9 +24,9 @@
    :Return                'rewindable.ago/ago-return-chan})
 
 ; From https://github.com/clojure/core.async/blob/master/src/main/clojure/cljs/core/async/macros.clj
-(defmacro my-go [& body]
+(defmacro my-go [ago-world & body]
   (let [sm (ioc/state-machine body 1 &env my-async-terminators)]
-    `(let [c# (rewindable.ago/chan 1)]
+    `(let [c# (rewindable.ago/ago-world-chan ~ago-world 1)]
        (cljs.core.async.impl.dispatch/run
         (fn []
           (let [sm# ~sm
