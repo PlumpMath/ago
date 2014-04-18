@@ -17,15 +17,22 @@
 
 (hello)
 
+(defn child [agw in-ch]
+  (my-go agw
+         (let [msg (<! in-ch)]
+           (println "yo" msg)
+           msg)))
+
 (let [hi-ch (listen-el (gdom/getElement "hi") "click")
       agw (make-ago-world)
       ch1 (ago-world-chan agw 1)]
   (my-go agw
          (loop [num-hi 0]
            (let [x (<! hi-ch)]
-             (>! ch1 [num-hi x])
              (println "num-hi" num-hi)
-             (let [[num-hi2 x2] (<! ch1)]
+             (>! ch1 [num-hi x])
+             (println :agw @agw)
+             (let [[num-hi2 x2] (<! (child agw ch1))]
                (if (or (not= x x2)
                        (not= num-hi num-hi2))
                  (println "ERROR"

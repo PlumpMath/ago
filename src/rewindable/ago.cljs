@@ -12,6 +12,16 @@
     (atom {:gen-id #(swap! last-id inc)
            :bufs {}})))
 
+(defn dissoc-in [m [k & ks :as keys]]
+  (if ks
+    (if-let [next-map (get m k)]
+      (let [new-map (dissoc-in next-map ks)]
+        (if (seq new-map)
+          (assoc m k new-map)
+          (dissoc m k)))
+      m)
+    (dissoc m k)))
+
 ; Persistent/immutable buffer implementation as an alternative to
 ; CLJS/core.async's default mutable RingBuffer, so that we can easily
 ; take ago-world snapshots.  Note: we have an unused length property
@@ -19,8 +29,11 @@
 (deftype FifoBuffer [ago-world buf-id length max-length]
   Object
   (pop [_]
+    ; Assumes nil is not a valid buffer item.
     (when-let [x (last (get-in @ago-world [:bufs buf-id]))]
       (swap! ago-world #(update-in % [:bufs buf-id] drop-last))
+      (when (empty? (get-in @ago-world [:bufs buf-id]))
+        (swap! ago-world #(dissoc-in % [:bufs buf-id])))
       x))
 
   (unshift [_ x]
