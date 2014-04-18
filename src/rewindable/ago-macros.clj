@@ -2,7 +2,7 @@
 ;; and provide events.  Useful for building things like visualizations
 ;; and simulations.
 
-(ns rewindable.ago
+(ns rewindable.ago-macros
   (:require [cljs.core.async.impl.ioc-macros :as ioc]))
 
 ; From https://github.com/clojure/core.async/blob/master/src/main/clojure/cljs/core/async/impl/ioc_macros.clj
@@ -15,18 +15,18 @@
 (def ^:const USER-START-IDX 6)
 
 (def my-async-terminators
-  {'<!                    'rewindable.agos/agos-take
-   'cljs.core.async/<!    'rewindable.agos/agos-take
-   '>!                    'rewindable.agos/agos-put
-   'cljs.core.async/>!    'rewindable.agos/agos-put
-   'alts!                 'rewindable.agos/agos-alts
-   'cljs.core.async/alts! 'rewindable.agos/agos-alts
-   :Return                'rewindable.agos/agos-return-chan})
+  {'<!                    'rewindable.ago/ago-take
+   'cljs.core.async/<!    'rewindable.ago/ago-take
+   '>!                    'rewindable.ago/ago-put
+   'cljs.core.async/>!    'rewindable.ago/ago-put
+   'alts!                 'rewindable.ago/ago-alts
+   'cljs.core.async/alts! 'rewindable.ago/ago-alts
+   :Return                'rewindable.ago/ago-return-chan})
 
 ; From https://github.com/clojure/core.async/blob/master/src/main/clojure/cljs/core/async/macros.clj
 (defmacro my-go [& body]
   (let [sm (ioc/state-machine body 1 &env my-async-terminators)]
-    `(let [c# (rewindable.agos/chan 1)]
+    `(let [c# (rewindable.ago/chan 1)]
        (cljs.core.async.impl.dispatch/run
         (fn []
           (let [sm# ~sm
