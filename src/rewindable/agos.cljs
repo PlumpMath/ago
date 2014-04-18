@@ -7,67 +7,44 @@
             [cljs.core.async.impl.dispatch :as dispatch]
             [cljs.core.async.impl.protocols :as protocols]))
 
-(deftype RingBuffer [^:mutable head ^:mutable tail ^:mutable length ^:mutable arr]
+(defn make-uverse []
+  (let [last-id (atom 0)]
+    (atom {:gen-id #(swap! last-id inc)
+           :bufs {}})))
+
+; Persistent buffer implementation as an alternative to
+; CLJS/core.async's default mutable RingBuffer.
+(deftype UverseBuf [uverse buf-id ^:mutable length]
   Object
   (pop [_]
-    (when-not (zero? length)
-      (let [x (aget arr tail)]
-        (aset arr tail nil)
-        (set! tail (js-mod (inc tail) (alength arr)))
-        (set! length (dec length))
-        x)))
+    (when-let [x (last (get-in @uverse [:bufs buf-id]))]
+      (swap! uverse #(update-in % [:bufs buf-id] drop-last))
+      (set! length (dec length))
+      x))
 
   (unshift [_ x]
-    (aset arr head x)
-    (set! head (js-mod (inc head) (alength arr)))
+    (swap! uverse #(update-in % [:bufs buf-id] conj x))
     (set! length (inc length))
     nil)
 
-  (unbounded-unshift [this x]
-    (if (== (inc length) (alength arr))
-      (.resize this))
+  (unbounded-unshift [this x] ; From RingBuffer 'interface'.
     (.unshift this x))
 
-  ;; Doubles the size of the buffer while retaining all the existing values
-  (resize
-    [_]
-    (let [new-arr-size (* (alength arr) 2)
-          new-arr (make-array new-arr-size)]
-      (cond
-       (< tail head)
-       (do (buffers/acopy arr tail new-arr 0 length)
-           (set! tail 0)
-           (set! head length)
-           (set! arr new-arr))
+  (resize [_] nil) ; From RingBuffer 'interface'.
 
-       (> tail head)
-       (do (buffers/acopy arr tail new-arr 0 (- (alength arr) tail))
-           (buffers/acopy arr 0 new-arr (- (alength arr) tail) head)
-           (set! tail 0)
-           (set! head length)
-           (set! arr new-arr))
+  (cleanup [_ keep?]
+    (swap! uverse #(update-in % [:bufs buf-id] (fn [xs] (filter keep? xs))))
+    (set! length (count (get-in @uverse [:bufs buf-id])))))
 
-       (== tail head)
-       (do (set! tail 0)
-           (set! head 0)
-           (set! arr new-arr)))))
-
-  (cleanup [this keep?]
-    (dotimes [x length]
-      (let [v (.pop this)]
-        (when ^boolean (keep? v)
-          (.unshift this v))))))
-
-(defn ring-buffer [n]
-  (assert (> n 0) "Can't create a ring buffer of size 0")
-  (RingBuffer. 0 0 0 (make-array n)))
+(defn uverse-buf [uverse]
+  (UverseBuf. uverse ((:gen-id @uverse)) 0))
 
 ; --------------------------------------------------------
 
 (defn chan-buf [buf]
   (println :chan-buf buf)
-  (channels/ManyToManyChannel. (ring-buffer 32) 0
-                               (ring-buffer 32) 0
+  (channels/ManyToManyChannel. (uverse-buf (make-uverse)) 0
+                               (uverse-buf (make-uverse)) 0
                                buf false))
 
 (defn chan
@@ -105,7 +82,7 @@
 
 (defn agos-chan [buf]
   (println :agos-chan buf)
-  (channels/ManyToManyChannel. (ring-buffer 32) 0
-                               (ring-buffer 32) 0
+  (channels/ManyToManyChannel. (uverse-buf (make-uverse)) 0
+                               (uverse-buf (make-uverse)) 0
                                buf false))
 
