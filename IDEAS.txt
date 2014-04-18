@@ -72,3 +72,15 @@ world
       timers
 
 
+at the time of a rewind...
+- should we clear the dispatcher tasks list?
+- we assign a new worldID
+- we reset atoms back to where they were
+- we run through our snapshot buffers and ... ???
+- we run through our snapshot ring-buffers and ... ???
+    update any parked Handlers?
+
+- we instantiate a new cohort of state machines and initialize
+    their states to the snapshoted state machines
+  but any parked handlers in any snapshotted ring-buffers
+    will be pointing to the OLD state machine arrays!
