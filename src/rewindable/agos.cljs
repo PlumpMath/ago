@@ -7,21 +7,67 @@
             [cljs.core.async.impl.dispatch :as dispatch]
             [cljs.core.async.impl.protocols :as protocols]))
 
-(defn box [val]
-  (reify cljs.core/IDeref
-    (-deref [_] val)))
+(deftype RingBuffer [^:mutable head ^:mutable tail ^:mutable length ^:mutable arr]
+  Object
+  (pop [_]
+    (when-not (zero? length)
+      (let [x (aget arr tail)]
+        (aset arr tail nil)
+        (set! tail (js-mod (inc tail) (alength arr)))
+        (set! length (dec length))
+        x)))
 
-(deftype PutBox [handler val])
+  (unshift [_ x]
+    (aset arr head x)
+    (set! head (js-mod (inc head) (alength arr)))
+    (set! length (inc length))
+    nil)
 
-(defn put-active? [box]
-  (protocols/active? (.-handler box)))
+  (unbounded-unshift [this x]
+    (if (== (inc length) (alength arr))
+      (.resize this))
+    (.unshift this x))
 
-(def ^:const MAX_DIRTY 64)
+  ;; Doubles the size of the buffer while retaining all the existing values
+  (resize
+    [_]
+    (let [new-arr-size (* (alength arr) 2)
+          new-arr (make-array new-arr-size)]
+      (cond
+       (< tail head)
+       (do (buffers/acopy arr tail new-arr 0 length)
+           (set! tail 0)
+           (set! head length)
+           (set! arr new-arr))
+
+       (> tail head)
+       (do (buffers/acopy arr tail new-arr 0 (- (alength arr) tail))
+           (buffers/acopy arr 0 new-arr (- (alength arr) tail) head)
+           (set! tail 0)
+           (set! head length)
+           (set! arr new-arr))
+
+       (== tail head)
+       (do (set! tail 0)
+           (set! head 0)
+           (set! arr new-arr)))))
+
+  (cleanup [this keep?]
+    (dotimes [x length]
+      (let [v (.pop this)]
+        (when ^boolean (keep? v)
+          (.unshift this v))))))
+
+(defn ring-buffer [n]
+  (assert (> n 0) "Can't create a ring buffer of size 0")
+  (RingBuffer. 0 0 0 (make-array n)))
+
+; --------------------------------------------------------
 
 (defn chan-buf [buf]
   (println :chan-buf buf)
-  (channels/ManyToManyChannel. (buffers/ring-buffer 32) 0
-                               (buffers/ring-buffer 32) 0
+  (channels/ManyToManyChannel. (ring-buffer 32) 0
+                               (ring-buffer 32) 0
                                buf false))
 
 (defn chan
@@ -59,7 +105,7 @@
 
 (defn agos-chan [buf]
   (println :agos-chan buf)
-  (channels/ManyToManyChannel. (buffers/ring-buffer 32) 0
-                               (buffers/ring-buffer 32) 0
+  (channels/ManyToManyChannel. (ring-buffer 32) 0
+                               (ring-buffer 32) 0
                                buf false))
 
