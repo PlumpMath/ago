@@ -22,6 +22,13 @@
       ch1 (ago-world-chan agw 1)]
   (my-go agw
          (loop [num-hi 0]
-           (<! hi-ch)
-           (println "num-hi" num-hi)
-           (recur (inc num-hi)))))
+           (let [x (<! hi-ch)]
+             (>! ch1 [num-hi x])
+             (println "num-hi" num-hi)
+             (let [[num-hi2 x2] (<! ch1)]
+               (if (or (not= x x2)
+                       (not= num-hi num-hi2))
+                 (println "ERROR"
+                          "x" x "num-hi" num-hi
+                          "x2" x2 "num-hi2" num-hi2)
+                 (recur (inc num-hi))))))))

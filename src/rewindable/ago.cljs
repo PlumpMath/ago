@@ -38,11 +38,10 @@
   protocols/Buffer
   (full? [this]
     (and (>= max-length 0)
-         (>= (.count this) max-length)))
+         (>= (count this) max-length)))
   (remove! [this]
     (.pop this))
   (add! [this itm]
-    (assert (not (.full? this)) "Can't add to a full FifoBuffer")
     (.unshift this itm))
 
   cljs.core/ICounted
@@ -55,7 +54,6 @@
 ; --------------------------------------------------------
 
 (defn ago-world-chan-buf [ago-world buf]
-  (println :ago-world-chan-buf buf)
   (channels/ManyToManyChannel. (fifo-buffer ago-world -1) 0
                                (fifo-buffer ago-world -1) 0
                                buf false))
@@ -76,18 +74,14 @@
 ; --------------------------------------------------------
 
 (defn ago-take [state blk ^not-native c]
-  (println :ago-take (rest state) blk c)
   (cljs.core.async.impl.ioc-helpers/take! state blk c))
 
 (defn ago-put [state blk ^not-native c val]
-  (println :ago-put (rest state) blk c val)
   (cljs.core.async.impl.ioc-helpers/put! state blk c val))
 
 (defn ago-alts [state cont-block ports & rest]
-  (println :ago-alts (rest state) cont-block ports rest)
   (apply cljs.core.async.impl.ioc-helpers/ioc-alts! state cont-block ports rest))
 
 (defn ago-return-chan [state value]
-  (println :ago-return-chan (rest state) value)
   (cljs.core.async.impl.ioc-helpers/return-chan state value))
 
