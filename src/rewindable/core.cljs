@@ -32,7 +32,12 @@
              (println "num-hi" num-hi)
              (>! ch1 [num-hi x])
              (println :agw @agw)
-             (let [[num-hi2 x2] (<! (child agw ch1))]
+             (let [child-ch (child agw ch1)
+                   [num-hi2 x2] (<! child-ch)]
+               (when (not= nil (<! child-ch))
+                 (println "ERROR expected closed child-ch"))
+               (when (not= nil (<! child-ch))
+                 (println "ERROR expected closed child-ch"))
                (if (or (not= x x2)
                        (not= num-hi num-hi2))
                  (println "ERROR"
