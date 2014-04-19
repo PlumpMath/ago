@@ -31,17 +31,21 @@
   (ago agw
        (loop [num-hi 0]
          (let [[x ch] (alts! [hi-ch stw-ch])]
-           (println "num-hi" num-hi)
-           (>! ch1 [num-hi x])
-           (let [child-ch (child agw ch1)
-                 [num-hi2 x2] (<! child-ch)]
-             (when (not= nil (<! child-ch))
-               (println "ERROR expected closed child-ch"))
-             (when (not= nil (<! child-ch))
-               (println "ERROR expected closed child-ch"))
-             (if (or (not= x x2)
-                     (not= num-hi num-hi2))
-               (println "ERROR"
-                        "x" x "num-hi" num-hi
-                        "x2" x2 "num-hi2" num-hi2)
-               (recur (inc num-hi))))))))
+           (cond
+            (= ch hi-ch)
+            (do (println "num-hi" num-hi)
+                (>! ch1 [num-hi x])
+                (let [child-ch (child agw ch1)
+                      [num-hi2 x2] (<! child-ch)]
+                  (when (not= nil (<! child-ch))
+                    (println "ERROR expected closed child-ch"))
+                  (when (not= nil (<! child-ch))
+                    (println "ERROR expected closed child-ch"))
+                  (if (or (not= x x2)
+                          (not= num-hi num-hi2))
+                    (println "ERROR"
+                             "x" x "num-hi" num-hi
+                             "x2" x2 "num-hi2" num-hi2)
+                    (recur (inc num-hi)))))
+            (= ch stw-ch)
+            (do (recur num-hi)))))))
