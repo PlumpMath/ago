@@ -8,6 +8,12 @@
 
 (enable-console-print!)
 
+(defn acopy [asrc adst]
+  (loop [idx 0]
+    (when (< idx (alength asrc))
+      (aset adst idx (aget asrc idx))
+      (recur (inc idx)))))
+
 (defn listen-el [el type]
   (let [out (chan)]
     (gevents/listen el type #(put! out %))
@@ -36,7 +42,40 @@
     (recur))
   (go-loop []
     (<! rtw-ch)
-    (reset! agw (ago-snapshot @last-snapshot))
+    (let [ss (ago-snapshot @last-snapshot)
+          agos-ss (:agos ss)
+          agos-cur (:agos @agw)
+          nxt-agos
+          (loop [ss-buf-ids (sort (keys agos-ss))
+                 cur-buf-ids (sort (keys agos-cur))
+                 acc-nxt-agos {}]
+            (let [ss-buf-id (first ss-buf-ids)
+                  cur-buf-id (first cur-buf-ids)]
+              (cond
+               (= nil ss-buf-id cur-buf-id) acc-nxt-agos
+
+               (and ss-buf-id ; In ss but not in cur.
+                    (or (nil? cur-buf-id) (< ss-buf-id cur-buf-id)))
+               (recur (rest ss-buf-ids)
+                      cur-buf-ids
+                      (assoc acc-nxt-agos ss-buf-id (get agos-ss ss-buf-id)))
+
+               (and cur-buf-id ; In cur but not in ss.
+                    (or (nil? ss-buf-id) (< cur-buf-id ss-buf-id)))
+               (recur ss-buf-ids
+                      (rest cur-buf-ids)
+                      acc-nxt-agos)
+
+               (= ss-buf-id cur-buf-id) ; In both cur and ss.
+               (let [sma-ss (get agos-ss ss-buf-id)
+                     sma-cur (get agos-cur cur-buf-id)]
+                 (acopy sma-ss sma-cur)
+                 (recur (rest ss-buf-ids)
+                        (rest cur-buf-ids)
+                        (assoc acc-nxt-agos cur-buf-id sma-cur)))
+
+               :else (println "UNEXPECTED case in snapshot revive"))))]
+      (swap! agw #(assoc % :agos nxt-agos)))
     (recur))
   (ago agw
        (loop [num-hi 0]
