@@ -27,14 +27,14 @@
 (defmacro ago [ago-world & body]
   (let [sm (ioc/state-machine body 1 &env my-async-terminators)]
     `(let [b# (rewindable.ago/fifo-buffer ~ago-world :ago 1)
-           c# (rewindable.ago/ago-chan-buf ~ago-world b#)]
+           c# (rewindable.ago/ago-chan-buf ~ago-world b#)
+           sm# ~sm
+           sm-instance# (sm#)
+           state# (ioc/aset-all! sm-instance#
+                                 cljs.core.async.impl.ioc-helpers/USER-START-IDX
+                                 c#)]
        (cljs.core.async.impl.dispatch/run
         (fn []
-          (let [sm# ~sm
-                sm-instance# (sm#)
-                state# (ioc/aset-all! sm-instance#
-                                      cljs.core.async.impl.ioc-helpers/USER-START-IDX
-                                      c#)]
-            (rewindable.ago/ago-reg-state-machine ~ago-world state# b#)
-            (cljs.core.async.impl.ioc-helpers/run-state-machine-wrapped state#))))
+          (rewindable.ago/ago-reg-state-machine ~ago-world state# b#)
+          (cljs.core.async.impl.ioc-helpers/run-state-machine-wrapped state#)))
        c#)))
