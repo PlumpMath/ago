@@ -29,13 +29,13 @@
     `(let [b# (rewindable.ago/fifo-buffer ~ago-world :ago 1)
            c# (rewindable.ago/ago-chan-buf ~ago-world b#)
            sm# ~sm
-           sm-instance# (sm#)
-           state# (ioc/aset-all! sm-instance#
-                                 cljs.core.async.impl.ioc-helpers/USER-START-IDX
-                                 c#)]
-       (rewindable.ago/ago-reg-state-machine ~ago-world state# b#)
+           sma# (sm#)
+           sma2# (ioc/aset-all! sma#
+                                cljs.core.async.impl.ioc-helpers/USER-START-IDX
+                                c#)]
+       (rewindable.ago/ago-reg-state-machine ~ago-world sma2# b#)
        (cljs.core.async.impl.dispatch/run
         (fn []
-          (rewindable.ago/ago-run-state-machine ~ago-world state# b#)
-          (cljs.core.async.impl.ioc-helpers/run-state-machine-wrapped state#)))
+          (rewindable.ago/ago-run-state-machine ~ago-world sma2# b#)
+          (cljs.core.async.impl.ioc-helpers/run-state-machine-wrapped sma2#)))
        c#)))

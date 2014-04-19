@@ -2,17 +2,11 @@
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]
                    [rewindable.ago-macros :refer [ago]])
   (:require [cljs.core.async :refer [chan <! !> alts! put!]]
-            [rewindable.ago :refer [make-ago-world ago-chan ago-snapshot]]
+            [rewindable.ago :refer [acopy make-ago-world ago-chan ago-snapshot]]
             [goog.dom :as gdom]
             [goog.events :as gevents]))
 
 (enable-console-print!)
-
-(defn acopy [asrc adst]
-  (loop [idx 0]
-    (when (< idx (alength asrc))
-      (aset adst idx (aget asrc idx))
-      (recur (inc idx)))))
 
 (defn listen-el [el type]
   (let [out (chan)]
@@ -57,8 +51,10 @@
                (and ss-buf-id ; In ss but not in cur.
                     (or (nil? cur-buf-id) (< ss-buf-id cur-buf-id)))
                (recur (rest ss-buf-ids) cur-buf-ids
-                      ; TODO: need to make a new sm instance?
-                      (assoc acc-nxt-agos ss-buf-id (get agos-ss ss-buf-id)))
+                      (let [ss-buf (get-in ss [:bufs ss-buf-id])
+                            sma-old (get agos-ss ss-buf-id)
+                            sma-new (ago-revive-state-machine agw sma-old ss-buf)]
+                        (assoc acc-nxt-agos ss-buf-id sma-new)))
 
                (and cur-buf-id ; In cur but not in ss.
                     (or (nil? ss-buf-id) (< cur-buf-id ss-buf-id)))

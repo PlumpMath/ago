@@ -15,6 +15,13 @@
 (def ^:const CURRENT-EXCEPTION 5)
 (def ^:const USER-START-IDX 6)
 
+(defn acopy [asrc adst & start-idx]
+  (loop [idx (or start-idx 0)]
+    (when (< idx (alength asrc))
+      (aset adst idx (aget asrc idx))
+      (recur (inc idx))))
+  adst)
+
 (defn dissoc-in [m [k & ks :as keys]]
   (if ks
     (if-let [next-map (get m k)]
@@ -125,6 +132,17 @@
   (swap! ago-world #(-> %
                         (dissoc-in [:agos-new (.-buf-id buf)])
                         (dissoc-in [:agos (.-buf-id buf)]))))
+
+(defn ago-revive-state-machine [ago-world old-sma buf]
+  (let [ch (rewindable.ago/ago-chan-buf ago-world buf)
+        new-sma (acopy old-sma ((aget old-sma FN-IDX)) STATE-IDX)
+        new-sma2 (ioc/aset-all! new-sma ioc-helpers/USER-START-IDX ch)]
+    (ago-reg-state-machine ~ago-world new-sma2 buf)
+    (dispatch/run
+     (fn []
+       (ago-run-state-machine ~ago-world new-sma2 buf)
+       (ioc-helpers/run-state-machine-wrapped new-sma2)))
+    ch))
 
 ; --------------------------------------------------------
 
