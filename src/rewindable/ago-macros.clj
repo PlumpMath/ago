@@ -24,7 +24,7 @@
    :Return                'rewindable.ago/ago-return-chan})
 
 ; From https://github.com/clojure/core.async/blob/master/src/main/clojure/cljs/core/async/macros.clj
-(defmacro my-go [ago-world & body]
+(defmacro ago [ago-world & body]
   (let [sm (ioc/state-machine body 1 &env my-async-terminators)]
     `(let [b# (rewindable.ago/fifo-buffer ~ago-world :ago 1)
            c# (rewindable.ago/ago-world-chan-buf ~ago-world b#)]
