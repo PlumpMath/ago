@@ -20,6 +20,7 @@
 (defn child [agw in-ch]
   (my-go agw
          (let [msg (<! in-ch)]
+           (println :agw @agw)
            (println "yo" msg)
            msg)))
 
@@ -32,7 +33,6 @@
            (let [[x ch] (alts! [hi-ch stw-ch])]
              (println "num-hi" num-hi)
              (>! ch1 [num-hi x])
-             (println :agw @agw)
              (let [child-ch (child agw ch1)
                    [num-hi2 x2] (<! child-ch)]
                (when (not= nil (<! child-ch))

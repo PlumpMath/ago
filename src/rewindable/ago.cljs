@@ -1,16 +1,27 @@
 ;; Custom SSA terminators to CLJS core async.
 
 (ns rewindable.ago
-  (:require [cljs.core.async.impl.ioc-helpers]
+  (:require [cljs.core.async.impl.ioc-helpers :as ioc-helpers]
             [cljs.core.async.impl.buffers :as buffers]
             [cljs.core.async.impl.channels :as channels]
             [cljs.core.async.impl.dispatch :as dispatch]
             [cljs.core.async.impl.protocols :as protocols]))
 
+(def ^:const FN-IDX 0)
+(def ^:const STATE-IDX 1)
+(def ^:const VALUE-IDX 2)
+(def ^:const BINDINGS-IDX 3)
+(def ^:const EXCEPTION-FRAMES 4)
+(def ^:const CURRENT-EXCEPTION 5)
+(def ^:const USER-START-IDX 6)
+
+; --------------------------------------------------------
+
 (defn make-ago-world []
   (let [last-id (atom 0)]
     (atom {:gen-id #(swap! last-id inc)
-           :bufs {}})))
+           :bufs {}     ; Keyed by buf-id.
+           :agos {}}))) ; Keyed by buf-id, value is state-machine array.
 
 (defn dissoc-in [m [k & ks :as keys]]
   (if ks
@@ -87,6 +98,14 @@
 
 ; --------------------------------------------------------
 
+(defn ago-world-reg-state-machine [ago-world state-machine-arr buf]
+  (swap! ago-world #(assoc-in % [:agos (.-buf-id buf)] state-machine-arr)))
+
+(defn ago-world-dereg-state-machine [ago-world buf]
+  (swap! ago-world #(dissoc-in % [:agos (.-buf-id buf)])))
+
+; --------------------------------------------------------
+
 (defn ago-take [state blk ^not-native c]
   (cljs.core.async.impl.ioc-helpers/take! state blk c))
 
@@ -97,5 +116,10 @@
   (apply cljs.core.async.impl.ioc-helpers/ioc-alts! state cont-block ports rest))
 
 (defn ago-return-chan [state value]
-  (cljs.core.async.impl.ioc-helpers/return-chan state value))
+  (let [^not-native c (aget state USER-START-IDX)]
+    (when-not (nil? value)
+      (protocols/put! c value (ioc-helpers/fn-handler (fn [] nil))))
+    (protocols/close! c)
+    (ago-world-dereg-state-machine (.-ago-world (.-buf c)) (.-buf c))
+    c))
 
