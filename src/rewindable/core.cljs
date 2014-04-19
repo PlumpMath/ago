@@ -56,20 +56,20 @@
 
                (and ss-buf-id ; In ss but not in cur.
                     (or (nil? cur-buf-id) (< ss-buf-id cur-buf-id)))
-               (recur (rest ss-buf-ids)
-                      cur-buf-ids
+               (recur (rest ss-buf-ids) cur-buf-ids
+                      ; TODO: need to make a new sm instance?
                       (assoc acc-nxt-agos ss-buf-id (get agos-ss ss-buf-id)))
 
                (and cur-buf-id ; In cur but not in ss.
                     (or (nil? ss-buf-id) (< cur-buf-id ss-buf-id)))
-               (recur ss-buf-ids
-                      (rest cur-buf-ids)
-                      acc-nxt-agos)
+               (recur ss-buf-ids (rest cur-buf-ids)
+                      ; TODO: need to explicitly close cur's sma?
+                      acc-nxt-agos) ; So, drop cur's sma.
 
                (= ss-buf-id cur-buf-id) ; In both cur and ss.
                (let [sma-ss (get agos-ss ss-buf-id)
                      sma-cur (get agos-cur cur-buf-id)]
-                 (acopy sma-ss sma-cur)
+                 (acopy sma-ss sma-cur) ; Rewind cur's sma.
                  (recur (rest ss-buf-ids)
                         (rest cur-buf-ids)
                         (assoc acc-nxt-agos cur-buf-id sma-cur)))
@@ -77,7 +77,9 @@
                :else (println "UNEXPECTED case in snapshot revive"))))]
       (swap! agw #(-> %
                       (assoc :bufs (:bufs ss))
-                      (assoc :agos nxt-agos))))
+                      (assoc :agos nxt-agos)
+                      ; TODO: need to make new sm instances for agos-new?
+                      (assoc :agos-new (:agos-new ss)))))
     (recur))
   (ago agw
        (loop [num-hi 0]
