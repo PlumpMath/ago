@@ -2,7 +2,8 @@
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]
                    [rewindable.ago-macros :refer [ago]])
   (:require [cljs.core.async :refer [chan <! !> alts! put!]]
-            [rewindable.ago :refer [acopy make-ago-world ago-chan ago-snapshot]]
+            [rewindable.ago :refer [acopy make-ago-world ago-chan ago-snapshot
+                                    ago-revive-state-machine]]
             [goog.dom :as gdom]
             [goog.events :as gevents]))
 
@@ -53,6 +54,7 @@
                (recur (rest ss-buf-ids) cur-buf-ids
                       (let [ss-buf (get-in ss [:bufs ss-buf-id])
                             sma-old (get agos-ss ss-buf-id)
+                            ; TODO: Need to pass an ago-world2 to revive.
                             sma-new (ago-revive-state-machine agw sma-old ss-buf)]
                         (assoc acc-nxt-agos ss-buf-id sma-new)))
 
