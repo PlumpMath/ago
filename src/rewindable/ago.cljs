@@ -15,14 +15,6 @@
 (def ^:const CURRENT-EXCEPTION 5)
 (def ^:const USER-START-IDX 6)
 
-; --------------------------------------------------------
-
-(defn make-ago-world []
-  (let [last-id (atom 0)]
-    (atom {:gen-id #(swap! last-id inc)
-           :bufs {}     ; Keyed by buf-id.
-           :agos {}}))) ; Keyed by buf-id, value is state-machine array.
-
 (defn dissoc-in [m [k & ks :as keys]]
   (if ks
     (if-let [next-map (get m k)]
@@ -32,6 +24,19 @@
           (dissoc m k)))
       m)
     (dissoc m k)))
+
+; --------------------------------------------------------
+
+(defn make-ago-world []
+  (let [last-id (atom 0)]
+    (atom {:gen-id #(swap! last-id inc)
+           :bufs {}     ; Keyed by buf-id.
+           :agos {}}))) ; Keyed by buf-id, value is state-machine array.
+
+(defn ago-snapshot [ago-world]
+  @ago-world)
+
+; --------------------------------------------------------
 
 ; Persistent/immutable buffer implementation as an alternative to
 ; CLJS/core.async's default mutable RingBuffer, so that we can easily
@@ -78,30 +83,30 @@
 
 ; --------------------------------------------------------
 
-(defn ago-world-chan-buf [ago-world buf]
+(defn ago-chan-buf [ago-world buf]
   (channels/ManyToManyChannel. (fifo-buffer ago-world :takes -1) 0
                                (fifo-buffer ago-world :puts -1) 0
                                buf false))
 
-(defn ago-world-chan
+(defn ago-chan
   "Creates a channel with an optional buffer. If buf-or-n is a
   number, will create and use a buffer with that max-length."
-  ([ago-world] (ago-world-chan ago-world nil))
+  ([ago-world] (ago-chan ago-world nil))
   ([ago-world buf-or-n]
      (let [buf-or-n (if (= buf-or-n 0)
                       nil
                       buf-or-n)]
-       (ago-world-chan-buf ago-world
-                           (if (number? buf-or-n)
-                             (fifo-buffer ago-world :buf buf-or-n)
-                             buf-or-n)))))
+       (ago-chan-buf ago-world
+                     (if (number? buf-or-n)
+                       (fifo-buffer ago-world :buf buf-or-n)
+                       buf-or-n)))))
 
 ; --------------------------------------------------------
 
-(defn ago-world-reg-state-machine [ago-world state-machine-arr buf]
+(defn ago-reg-state-machine [ago-world state-machine-arr buf]
   (swap! ago-world #(assoc-in % [:agos (.-buf-id buf)] state-machine-arr)))
 
-(defn ago-world-dereg-state-machine [ago-world buf]
+(defn ago-dereg-state-machine [ago-world buf]
   (swap! ago-world #(dissoc-in % [:agos (.-buf-id buf)])))
 
 ; --------------------------------------------------------
@@ -120,6 +125,6 @@
     (when-not (nil? value)
       (protocols/put! c value (ioc-helpers/fn-handler (fn [] nil))))
     (protocols/close! c)
-    (ago-world-dereg-state-machine (.-ago-world (.-buf c)) (.-buf c))
+    (ago-dereg-state-machine (.-ago-world (.-buf c)) (.-buf c))
     c))
 

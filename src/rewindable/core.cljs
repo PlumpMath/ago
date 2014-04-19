@@ -1,7 +1,7 @@
 (ns rewindable.core
   (:require-macros [rewindable.ago-macros :refer [ago]])
   (:require [cljs.core.async :refer [chan <! !> alts! put!]]
-            [rewindable.ago :refer [make-ago-world ago-world-chan]]
+            [rewindable.ago :refer [make-ago-world ago-chan ago-snapshot]]
             [goog.dom :as gdom]
             [goog.events :as gevents]))
 
@@ -27,9 +27,10 @@
 (let [hi-ch (listen-el (gdom/getElement "hi") "click")
       stw-ch (listen-el (gdom/getElement "stw") "click") ; save-the-world button
       agw (make-ago-world)
-      ch1 (ago-world-chan agw 1)]
+      ch1 (ago-chan agw 1)]
   (ago agw
-       (loop [num-hi 0]
+       (loop [num-hi 0
+              snapshot nil]
          (let [[x ch] (alts! [hi-ch stw-ch])]
            (cond
             (= ch hi-ch)
@@ -46,6 +47,7 @@
                     (println "ERROR"
                              "x" x "num-hi" num-hi
                              "x2" x2 "num-hi2" num-hi2)
-                    (recur (inc num-hi)))))
+                    (recur (inc num-hi) snapshot))))
             (= ch stw-ch)
-            (do (recur num-hi)))))))
+            (do (recur num-hi
+                       (ago-snapshot agw))))))))
