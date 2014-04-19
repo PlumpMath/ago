@@ -38,46 +38,46 @@
   (go-loop []
     (<! rtw-ch)
     (let [ss (ago-snapshot @last-snapshot)
-          agos-ss (:agos ss)
-          agos-cur (:agos @agw)
-          nxt-agos
-          (loop [ss-buf-ids (sort (keys agos-ss))
-                 cur-buf-ids (sort (keys agos-cur))
-                 acc-nxt-agos {}]
+          smas-ss (:smas ss)
+          smas-cur (:smas @agw)
+          nxt-smas
+          (loop [ss-buf-ids (sort (keys smas-ss))
+                 cur-buf-ids (sort (keys smas-cur))
+                 acc-nxt-smas {}]
             (let [ss-buf-id (first ss-buf-ids)
                   cur-buf-id (first cur-buf-ids)]
               (cond
-               (= nil ss-buf-id cur-buf-id) acc-nxt-agos
+               (= nil ss-buf-id cur-buf-id) acc-nxt-smas
 
                (and ss-buf-id ; In ss but not in cur.
                     (or (nil? cur-buf-id) (< ss-buf-id cur-buf-id)))
                (recur (rest ss-buf-ids) cur-buf-ids
                       (let [ss-buf (get-in ss [:bufs ss-buf-id])
-                            sma-old (get agos-ss ss-buf-id)
+                            sma-old (get smas-ss ss-buf-id)
                             ; TODO: Need to pass an ago-world2 to revive.
                             sma-new (ago-revive-state-machine agw sma-old ss-buf)]
-                        (assoc acc-nxt-agos ss-buf-id sma-new)))
+                        (assoc acc-nxt-smas ss-buf-id sma-new)))
 
                (and cur-buf-id ; In cur but not in ss.
                     (or (nil? ss-buf-id) (< cur-buf-id ss-buf-id)))
                (recur ss-buf-ids (rest cur-buf-ids)
                       ; TODO: need to explicitly close cur's sma?
-                      acc-nxt-agos) ; So, drop cur's sma.
+                      acc-nxt-smas) ; So, drop cur's sma.
 
                (= ss-buf-id cur-buf-id) ; In both cur and ss.
-               (let [sma-ss (get agos-ss ss-buf-id)
-                     sma-cur (get agos-cur cur-buf-id)]
+               (let [sma-ss (get smas-ss ss-buf-id)
+                     sma-cur (get smas-cur cur-buf-id)]
                  (acopy sma-ss sma-cur) ; Rewind cur's sma.
                  (recur (rest ss-buf-ids)
                         (rest cur-buf-ids)
-                        (assoc acc-nxt-agos cur-buf-id sma-cur)))
+                        (assoc acc-nxt-smas cur-buf-id sma-cur)))
 
                :else (println "UNEXPECTED case in snapshot revive"))))]
       (swap! agw #(-> %
                       (assoc :bufs (:bufs ss))
-                      (assoc :agos nxt-agos)
-                      ; TODO: need to make new sm instances for agos-new?
-                      (assoc :agos-new (:agos-new ss)))))
+                      (assoc :smas nxt-smas)
+                      ; TODO: need to make new sm instances for smas-new?
+                      (assoc :smas-new (:smas-new ss)))))
     (recur))
   (ago agw
        (loop [num-hi 0]

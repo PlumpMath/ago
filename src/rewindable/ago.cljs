@@ -44,14 +44,14 @@
   (let [last-id (atom 0)]
     (atom {:gen-id #(swap! last-id inc)
            :bufs {}     ; Keyed by buf-id.
-           :agos {}     ; Keyed by buf-id, value is state-machine array.
-           :agos-new {} ; Same as :agos, but for new, not yet run goroutines.
+           :smas {}     ; Keyed by buf-id, value is state-machine array.
+           :smas-new {} ; Same as :smas, but for new, not yet run goroutines.
            })))
 
 (defn ago-snapshot [ago-world-now]
   (-> ago-world-now
-      (assoc :agos (copy-sma-map (:agos ago-world-now)))
-      (assoc :agos-new (copy-sma-map (:agos-new ago-world-now)))))
+      (assoc :smas (copy-sma-map (:smas ago-world-now)))
+      (assoc :smas-new (copy-sma-map (:smas-new ago-world-now)))))
 
 ; --------------------------------------------------------
 
@@ -121,17 +121,17 @@
 ; --------------------------------------------------------
 
 (defn ago-reg-state-machine [ago-world state-machine-arr buf]
-  (swap! ago-world #(assoc-in % [:agos-new (.-buf-id buf)] state-machine-arr)))
+  (swap! ago-world #(assoc-in % [:smas-new (.-buf-id buf)] state-machine-arr)))
 
 (defn ago-run-state-machine [ago-world state-machine-arr buf]
   (swap! ago-world #(-> %
-                        (dissoc-in [:agos-new (.-buf-id buf)])
-                        (assoc-in [:agos (.-buf-id buf)] state-machine-arr))))
+                        (dissoc-in [:smas-new (.-buf-id buf)])
+                        (assoc-in [:smas (.-buf-id buf)] state-machine-arr))))
 
 (defn ago-dereg-state-machine [ago-world buf]
   (swap! ago-world #(-> %
-                        (dissoc-in [:agos-new (.-buf-id buf)])
-                        (dissoc-in [:agos (.-buf-id buf)]))))
+                        (dissoc-in [:smas-new (.-buf-id buf)])
+                        (dissoc-in [:smas (.-buf-id buf)]))))
 
 (defn ago-revive-state-machine [ago-world old-sma buf]
   (let [ch (rewindable.ago/ago-chan-buf ago-world buf)
