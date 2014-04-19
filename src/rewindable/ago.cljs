@@ -7,14 +7,6 @@
             [cljs.core.async.impl.dispatch :as dispatch]
             [cljs.core.async.impl.protocols :as protocols]))
 
-(def ^:const FN-IDX 0)
-(def ^:const STATE-IDX 1)
-(def ^:const VALUE-IDX 2)
-(def ^:const BINDINGS-IDX 3)
-(def ^:const EXCEPTION-FRAMES 4)
-(def ^:const CURRENT-EXCEPTION 5)
-(def ^:const USER-START-IDX 6)
-
 (defn acopy [asrc adst & start-idx]
   (loop [idx (or start-idx 0)]
     (when (< idx (alength asrc))
@@ -135,7 +127,8 @@
 
 (defn ago-revive-state-machine [ago-world old-sma buf]
   (let [ch (rewindable.ago/ago-chan-buf ago-world buf)
-        new-sma (acopy old-sma ((aget old-sma FN-IDX)) STATE-IDX)
+        new-sma (acopy old-sma ((aget old-sma ioc-helpers/FN-IDX))
+                       ioc-helpers/STATE-IDX) ; We depend on *-IDX ordering.
         new-sma2 (ioc/aset-all! new-sma ioc-helpers/USER-START-IDX ch)]
     (ago-reg-state-machine ~ago-world new-sma2 buf)
     (dispatch/run
@@ -156,7 +149,7 @@
   (apply cljs.core.async.impl.ioc-helpers/ioc-alts! state cont-block ports rest))
 
 (defn ago-return-chan [state value]
-  (let [^not-native c (aget state USER-START-IDX)]
+  (let [^not-native c (aget state ioc-helpers/USER-START-IDX)]
     (when-not (nil? value)
       (protocols/put! c value (ioc-helpers/fn-handler (fn [] nil))))
     (protocols/close! c)
