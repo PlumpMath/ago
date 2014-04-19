@@ -34,7 +34,12 @@
            :agos {}}))) ; Keyed by buf-id, value is state-machine array.
 
 (defn ago-snapshot [ago-world]
-  @ago-world)
+  (let [agw @ago-world]
+    (assoc agw :agos
+           (apply hash-map
+                  (mapcat (fn [[buf-id sma]]
+                            [buf-id (aclone sma)])
+                       (:agos agw))))))
 
 ; --------------------------------------------------------
 
