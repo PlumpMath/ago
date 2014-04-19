@@ -26,12 +26,17 @@
 
 (let [hi-ch (listen-el (gdom/getElement "hi") "click")
       stw-ch (listen-el (gdom/getElement "stw") "click") ; save-the-world button
+      rtw-ch (listen-el (gdom/getElement "rtw") "click") ; restore-the-world button
       last-snapshot (atom nil)
       agw (make-ago-world)
       ch1 (ago-chan agw 1)]
   (go-loop []
     (<! stw-ch)
-    (reset! last-snapshot (ago-snapshot agw))
+    (reset! last-snapshot (ago-snapshot @agw))
+    (recur))
+  (go-loop []
+    (<! rtw-ch)
+    (reset! agw (ago-snapshot @last-snapshot))
     (recur))
   (ago agw
        (loop [num-hi 0]
