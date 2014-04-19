@@ -27,6 +27,12 @@
 
 ; --------------------------------------------------------
 
+(defn copy-sma-map [sma-map] ; Copy a hash-map of <buf-id => state-machine-array>.
+  (apply hash-map (mapcat (fn [[buf-id sma]] [buf-id (aclone sma)])
+                          sma-map)))
+
+; --------------------------------------------------------
+
 (defn make-ago-world []
   (let [last-id (atom 0)]
     (atom {:gen-id #(swap! last-id inc)
@@ -36,11 +42,9 @@
            })))
 
 (defn ago-snapshot [ago-world-now]
-  (assoc ago-world-now :agos
-         (apply hash-map
-                (mapcat (fn [[buf-id sma]]
-                          [buf-id (aclone sma)])
-                        (:agos ago-world-now)))))
+  (-> ago-world-now
+      (assoc :agos (copy-sma-map (:agos ago-world-now)))
+      (assoc :agos-new (copy-sma-map (:agos-new ago-world-now)))))
 
 ; --------------------------------------------------------
 

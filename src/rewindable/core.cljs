@@ -75,7 +75,9 @@
                         (assoc acc-nxt-agos cur-buf-id sma-cur)))
 
                :else (println "UNEXPECTED case in snapshot revive"))))]
-      (swap! agw #(assoc % :agos nxt-agos)))
+      (swap! agw #(-> %
+                      (assoc :bufs (:bufs ss))
+                      (assoc :agos nxt-agos))))
     (recur))
   (ago agw
        (loop [num-hi 0]
