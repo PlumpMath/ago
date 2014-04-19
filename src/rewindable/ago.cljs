@@ -110,6 +110,9 @@
 (defn ago-reg-state-machine [ago-world state-machine-arr buf]
   (swap! ago-world #(assoc-in % [:agos (.-buf-id buf)] state-machine-arr)))
 
+(defn ago-run-state-machine [ago-world state-machine-arr buf]
+  :todo)
+
 (defn ago-dereg-state-machine [ago-world buf]
   (swap! ago-world #(dissoc-in % [:agos (.-buf-id buf)])))
 

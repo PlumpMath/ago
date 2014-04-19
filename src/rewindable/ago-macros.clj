@@ -33,8 +33,9 @@
            state# (ioc/aset-all! sm-instance#
                                  cljs.core.async.impl.ioc-helpers/USER-START-IDX
                                  c#)]
+       (rewindable.ago/ago-reg-state-machine ~ago-world state# b#)
        (cljs.core.async.impl.dispatch/run
         (fn []
-          (rewindable.ago/ago-reg-state-machine ~ago-world state# b#)
+          (rewindable.ago/ago-run-state-machine ~ago-world state# b#)
           (cljs.core.async.impl.ioc-helpers/run-state-machine-wrapped state#)))
        c#)))
