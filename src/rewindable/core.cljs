@@ -47,7 +47,7 @@
                                                                   (:smas-new ss)
                                                                   (:smas-new @agw))]
       (swap! agw #(-> %
-                      (assoc :bufs (:bufs ss))
+                      (assoc :bufs bufs-ss)
                       (assoc :smas recycled-smas)
                       (assoc :smas-new recycled-smasN)))
       (doseq [[sma-old ss-buf] reborn-smas]
