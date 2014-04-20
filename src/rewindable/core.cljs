@@ -28,6 +28,7 @@
 
 (let [hi-ch (listen-el (gdom/getElement "hi") "click")
       bye-ch (listen-el (gdom/getElement "bye") "click")
+      fie-ch (listen-el (gdom/getElement "fie") "click")
       stw-ch (listen-el (gdom/getElement "stw") "click") ; save-the-world button
       rtw-ch (listen-el (gdom/getElement "rtw") "click") ; restore-the-world button
       last-snapshot (atom nil)
@@ -90,5 +91,26 @@
                     (println "ERROR"
                              "x" x "num-bye" num-bye
                              "x2" x2 "num-bye2" num-bye2)
-                    (recur num-hi (inc num-bye))))))))))
+                    (recur num-hi (inc num-bye)))))))))
+  (ago agw
+       (loop [num-fie 0]
+         (println "num-fie" num-fie)
+         (println :agw @agw)
+         (println :lss @last-snapshot)
+         (let [[x ch] (alts! [fie-ch])]
+           (cond
+            (= ch fie-ch)
+            (do (>! ch1 [num-fie x])
+                (let [child-ch (child agw ch1)
+                      [num-fie2 x2] (<! child-ch)]
+                  (when (not= nil (<! child-ch))
+                    (println "ERROR expected closed child-ch"))
+                  (when (not= nil (<! child-ch))
+                    (println "ERROR expected closed child-ch"))
+                  (if (or (not= x x2)
+                          (not= num-fie num-fie2))
+                    (println "ERROR"
+                             "x" x "num-fie" num-fie
+                             "x2" x2 "num-fie2" num-fie2)
+                    (recur (inc num-fie))))))))))
 
