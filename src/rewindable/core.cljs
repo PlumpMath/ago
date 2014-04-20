@@ -25,6 +25,40 @@
          (println "yo" msg)
          msg)))
 
+(defn revive-smas [agw bufs-ss smas-ss smas-cur]
+  (loop [ss-buf-ids (sort (keys smas-ss))
+         cur-buf-ids (sort (keys smas-cur))
+         acc-nxt-smas {}]
+    (let [ss-buf-id (first ss-buf-ids)
+          cur-buf-id (first cur-buf-ids)]
+      (cond
+       (= nil ss-buf-id cur-buf-id) acc-nxt-smas ; Loop exit.
+
+       (and ss-buf-id ; In ss but not in cur.
+            (or (nil? cur-buf-id) (< ss-buf-id cur-buf-id)))
+       (recur (rest ss-buf-ids) cur-buf-ids
+              (let [ss-buf (get bufs-ss ss-buf-id)
+                    sma-old (get smas-ss ss-buf-id)
+                    ; TODO: Need to pass an ago-world2 to revive.
+                    sma-new (ago-revive-state-machine agw sma-old ss-buf)]
+                (assoc acc-nxt-smas ss-buf-id sma-new)))
+
+       (and cur-buf-id ; In cur but not in ss.
+            (or (nil? ss-buf-id) (< cur-buf-id ss-buf-id)))
+       (recur ss-buf-ids (rest cur-buf-ids)
+              ; TODO: need to explicitly close cur's sma?
+              acc-nxt-smas) ; So, drop cur's sma.
+
+       (= ss-buf-id cur-buf-id) ; In both cur and ss.
+       (let [sma-ss (get smas-ss ss-buf-id)
+             sma-cur (get smas-cur cur-buf-id)]
+         (acopy sma-ss sma-cur) ; Rewind cur's sma.
+         (recur (rest ss-buf-ids)
+                (rest cur-buf-ids)
+                (assoc acc-nxt-smas cur-buf-id sma-cur)))
+
+       :else (println "UNEXPECTED case in snapshot revive")))))
+
 (let [hi-ch (listen-el (gdom/getElement "hi") "click")
       stw-ch (listen-el (gdom/getElement "stw") "click") ; save-the-world button
       rtw-ch (listen-el (gdom/getElement "rtw") "click") ; restore-the-world button
@@ -40,39 +74,7 @@
     (let [ss (ago-snapshot @last-snapshot)
           smas-ss (:smas ss)
           smas-cur (:smas @agw)
-          nxt-smas
-          (loop [ss-buf-ids (sort (keys smas-ss))
-                 cur-buf-ids (sort (keys smas-cur))
-                 acc-nxt-smas {}]
-            (let [ss-buf-id (first ss-buf-ids)
-                  cur-buf-id (first cur-buf-ids)]
-              (cond
-               (= nil ss-buf-id cur-buf-id) acc-nxt-smas
-
-               (and ss-buf-id ; In ss but not in cur.
-                    (or (nil? cur-buf-id) (< ss-buf-id cur-buf-id)))
-               (recur (rest ss-buf-ids) cur-buf-ids
-                      (let [ss-buf (get-in ss [:bufs ss-buf-id])
-                            sma-old (get smas-ss ss-buf-id)
-                            ; TODO: Need to pass an ago-world2 to revive.
-                            sma-new (ago-revive-state-machine agw sma-old ss-buf)]
-                        (assoc acc-nxt-smas ss-buf-id sma-new)))
-
-               (and cur-buf-id ; In cur but not in ss.
-                    (or (nil? ss-buf-id) (< cur-buf-id ss-buf-id)))
-               (recur ss-buf-ids (rest cur-buf-ids)
-                      ; TODO: need to explicitly close cur's sma?
-                      acc-nxt-smas) ; So, drop cur's sma.
-
-               (= ss-buf-id cur-buf-id) ; In both cur and ss.
-               (let [sma-ss (get smas-ss ss-buf-id)
-                     sma-cur (get smas-cur cur-buf-id)]
-                 (acopy sma-ss sma-cur) ; Rewind cur's sma.
-                 (recur (rest ss-buf-ids)
-                        (rest cur-buf-ids)
-                        (assoc acc-nxt-smas cur-buf-id sma-cur)))
-
-               :else (println "UNEXPECTED case in snapshot revive"))))]
+          nxt-smas (revive-smas agw (:bufs ss) smas-ss smas-cur)]
       (swap! agw #(-> %
                       (assoc :bufs (:bufs ss))
                       (assoc :smas nxt-smas)
