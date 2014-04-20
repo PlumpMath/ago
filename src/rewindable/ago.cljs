@@ -212,11 +212,11 @@
                                                                 (:smas @ago-world))
           [recycled-smasN reborn-smasN] (ago-judge-state-machines (:bufs ss)
                                                                   (:smas-new ss)
-                                                                  (:smas-new @ago-world))]
+                                                                  (:smas-new @ago-world))
+          branch-id (- ((:gen-id @ago-world)))] ; Negative in case snapshot re-restored.
       (swap! ago-world
              #(-> %
-                  (assoc :seqv (conj (:seqv ss)
-                                     ((:gen-id @ago-world)) 0)) ; Extend the seqv.
+                  (assoc :seqv (conj (:seqv ss) branch-id 0))
                   (assoc :bufs (:bufs ss))
                   (assoc :smas recycled-smas)
                   (assoc :smas-new recycled-smasN)))
