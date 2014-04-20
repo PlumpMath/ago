@@ -2,7 +2,8 @@
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]
                    [rewindable.ago-macros :refer [ago]])
   (:require [cljs.core.async :refer [chan <! !> alts! put!]]
-            [rewindable.ago :refer [acopy make-ago-world ago-chan ago-snapshot
+            [rewindable.ago :refer [make-ago-world ago-chan ago-snapshot
+                                    ago-judge-state-machines
                                     ago-revive-state-machine]]
             [goog.dom :as gdom]
             [goog.events :as gevents]))
@@ -25,43 +26,6 @@
          (println "yo" msg)
          msg)))
 
-(defn revive-smas [bufs-ss smas-ss smas-cur]
-  (loop [ss-buf-ids (sort (keys smas-ss))
-         cur-buf-ids (sort (keys smas-cur))
-         acc-recycled-smas {} ; State machines shared by ss and cur.
-         acc-reborn-smas []]  ; State machines that need rebirth (were in ss only).
-    (let [ss-buf-id (first ss-buf-ids)
-          cur-buf-id (first cur-buf-ids)]
-      (cond
-       (= nil ss-buf-id cur-buf-id)
-       [acc-recycled-smas acc-reborn-smas]
-
-       (and ss-buf-id ; In ss but not in cur.
-            (or (nil? cur-buf-id) (< ss-buf-id cur-buf-id)))
-       (recur (rest ss-buf-ids) cur-buf-ids
-              acc-recycled-smas
-              (let [ss-buf (get bufs-ss ss-buf-id)
-                    sma-old (get smas-ss ss-buf-id)]
-                ; Later, can invoke (ago-revive-state-machine agw sma-old ss-buf).
-                (conj acc-reborn-smas [sma-old ss-buf])))
-
-       (and cur-buf-id ; In cur but not in ss, so drop cur's sma.
-            (or (nil? ss-buf-id) (< cur-buf-id ss-buf-id)))
-       (recur ss-buf-ids (rest cur-buf-ids)
-              acc-recycled-smas
-              acc-reborn-smas)
-
-       (= ss-buf-id cur-buf-id) ; In both cur and ss.
-       (let [sma-ss (get smas-ss ss-buf-id)
-             sma-cur (get smas-cur cur-buf-id)]
-         (acopy sma-ss sma-cur) ; Recycle the cur's sma.
-         (recur (rest ss-buf-ids)
-                (rest cur-buf-ids)
-                (assoc acc-recycled-smas cur-buf-id sma-cur)
-                acc-reborn-smas))
-
-       :else (println "UNEXPECTED case in snapshot revive")))))
-
 (let [hi-ch (listen-el (gdom/getElement "hi") "click")
       stw-ch (listen-el (gdom/getElement "stw") "click") ; save-the-world button
       rtw-ch (listen-el (gdom/getElement "rtw") "click") ; restore-the-world button
@@ -75,17 +39,20 @@
   (go-loop []
     (<! rtw-ch)
     (let [ss (ago-snapshot @last-snapshot)
-          [recycled-smas reborn-smas] (revive-smas (:bufs ss)
-                                                   (:smas ss) (:smas @agw))
-          [recycled-smas2 reborn-smas2] (revive-smas (:bufs ss)
-                                                     (:smas-new ss) (:smas-new @agw))]
+          bufs-ss (:bufs ss)
+          [recycled-smas reborn-smas] (ago-judge-state-machines bufs-ss
+                                                                (:smas ss)
+                                                                (:smas @agw))
+          [recycled-smasN reborn-smasN] (ago-judge-state-machines bufs-ss
+                                                                  (:smas-new ss)
+                                                                  (:smas-new @agw))]
       (swap! agw #(-> %
                       (assoc :bufs (:bufs ss))
                       (assoc :smas recycled-smas)
-                      (assoc :smas-new recycled-smas2)))
+                      (assoc :smas-new recycled-smasN)))
       (doseq [[sma-old ss-buf] reborn-smas]
         (ago-revive-state-machine agw sma-old ss-buf))
-      (doseq [[sma-old ss-buf] reborn-smas2]
+      (doseq [[sma-old ss-buf] reborn-smasN]
         (ago-revive-state-machine agw sma-old ss-buf)))
     (recur))
   (ago agw

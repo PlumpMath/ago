@@ -137,6 +137,45 @@
        (ioc-helpers/run-state-machine-wrapped new-sma2)))
     ch))
 
+(defn ago-judge-state-machines [bufs-ss smas-ss smas-cur]
+  (loop [ss-buf-ids (sort (keys smas-ss))
+         cur-buf-ids (sort (keys smas-cur))
+         acc-recycled-smas {} ; State machines shared by ss and cur (just need reset).
+         acc-reborn-smas []]  ; State machines that need rebirth (were in ss only).
+    (let [ss-buf-id (first ss-buf-ids)
+          cur-buf-id (first cur-buf-ids)]
+      (cond
+       (= nil ss-buf-id cur-buf-id)
+       [acc-recycled-smas acc-reborn-smas]
+
+       (and ss-buf-id ; In ss but not in cur.
+            (or (nil? cur-buf-id)
+                (< ss-buf-id cur-buf-id)))
+       (recur (rest ss-buf-ids) cur-buf-ids
+              acc-recycled-smas
+              (let [ss-buf (get bufs-ss ss-buf-id)
+                    sma-old (get smas-ss ss-buf-id)]
+                ; Later, can invoke (ago-revive-state-machine agw sma-old ss-buf).
+                (conj acc-reborn-smas [sma-old ss-buf])))
+
+       (and cur-buf-id ; In cur but not in ss, so drop cur's sma.
+            (or (nil? ss-buf-id)
+                (< cur-buf-id ss-buf-id)))
+       (recur ss-buf-ids (rest cur-buf-ids)
+              acc-recycled-smas
+              acc-reborn-smas)
+
+       (= ss-buf-id cur-buf-id) ; In both cur and ss.
+       (let [sma-ss (get smas-ss ss-buf-id)
+             sma-cur (get smas-cur cur-buf-id)]
+         (acopy sma-ss sma-cur) ; Recycle the cur's sma.
+         (recur (rest ss-buf-ids)
+                (rest cur-buf-ids)
+                (assoc acc-recycled-smas cur-buf-id sma-cur)
+                acc-reborn-smas))
+
+       :else (println "UNEXPECTED case in ago-judge-state-machines")))))
+
 ; --------------------------------------------------------
 
 (defn ago-take [state blk ^not-native c]
