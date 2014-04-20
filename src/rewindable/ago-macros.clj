@@ -17,7 +17,8 @@
 ; From https://github.com/clojure/core.async/blob/master/src/main/clojure/cljs/core/async/macros.clj
 (defmacro ago [ago-world & body]
   (let [sm (ioc/state-machine body 1 &env my-async-terminators)]
-    `(let [b# (rewindable.ago/fifo-buffer ~ago-world :ago 1)
+    `(let [i# (str "ago-" ((:gen-id @~ago-world)))
+           b# (rewindable.ago/fifo-buffer ~ago-world i# 1)
            c# (rewindable.ago/ago-chan-buf ~ago-world b#)
            sm# ~sm
            sma# (sm#)

@@ -84,16 +84,16 @@
   (-count [this]
     (count (get-in @ago-world [:bufs buf-id]))))
 
-(defn fifo-buffer [ago-world label max-length]
-  (FifoBuffer. ago-world (str label "-" ((:gen-id @ago-world)))
-               -123 max-length))
+(defn fifo-buffer [ago-world buf-id max-length]
+  (FifoBuffer. ago-world buf-id -123 max-length))
 
 ; --------------------------------------------------------
 
 (defn ago-chan-buf [ago-world buf]
-  (channels/ManyToManyChannel. (fifo-buffer ago-world :takes -1) 0
-                               (fifo-buffer ago-world :puts -1) 0
-                               buf false))
+  (channels/ManyToManyChannel.
+   (fifo-buffer ago-world (str (.-buf-id buf) "-takes") -1) 0
+   (fifo-buffer ago-world (str (.-buf-id buf) "-puts") -1) 0
+   buf false))
 
 (defn ago-chan
   "Creates a channel with an optional buffer. If buf-or-n is a
@@ -105,7 +105,9 @@
                       buf-or-n)]
        (ago-chan-buf ago-world
                      (if (number? buf-or-n)
-                       (fifo-buffer ago-world :buf buf-or-n)
+                       (fifo-buffer ago-world
+                                    (str "ch-" ((:gen-id @ago-world)))
+                                    buf-or-n)
                        buf-or-n)))))
 
 ; --------------------------------------------------------
