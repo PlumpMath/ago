@@ -2,9 +2,8 @@
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]
                    [rewindable.ago-macros :refer [ago]])
   (:require [cljs.core.async :refer [chan <! !> alts! put!]]
-            [rewindable.ago :refer [make-ago-world ago-chan ago-snapshot
-                                    ago-judge-state-machines
-                                    ago-revive-state-machine]]
+            [rewindable.ago :refer [make-ago-world ago-chan
+                                    ago-snapshot ago-restore]]
             [goog.dom :as gdom]
             [goog.events :as gevents]))
 
@@ -36,26 +35,11 @@
       ch1 (ago-chan agw 1)]
   (go-loop []
     (<! stw-ch)
-    (reset! last-snapshot (ago-snapshot @agw))
+    (reset! last-snapshot (ago-snapshot agw))
     (recur))
   (go-loop []
     (<! rtw-ch)
-    (let [ss (ago-snapshot @last-snapshot)
-          bufs-ss (:bufs ss)
-          [recycled-smas reborn-smas] (ago-judge-state-machines bufs-ss
-                                                                (:smas ss)
-                                                                (:smas @agw))
-          [recycled-smasN reborn-smasN] (ago-judge-state-machines bufs-ss
-                                                                  (:smas-new ss)
-                                                                  (:smas-new @agw))]
-      (swap! agw #(-> %
-                      (assoc :bufs bufs-ss)
-                      (assoc :smas recycled-smas)
-                      (assoc :smas-new recycled-smasN)))
-      (doseq [[sma-old ss-buf] reborn-smas]
-        (ago-revive-state-machine agw sma-old ss-buf))
-      (doseq [[sma-old ss-buf] reborn-smasN]
-        (ago-revive-state-machine agw sma-old ss-buf)))
+    (ago-restore agw @last-snapshot)
     (recur))
   (ago agw
        (loop [num-hi 0 num-bye 0]

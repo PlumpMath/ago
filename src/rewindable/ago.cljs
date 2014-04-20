@@ -35,15 +35,6 @@
            :smas-new {} ; Same as :smas, but for new, not yet run goroutines.
            })))
 
-(defn copy-sma-map [sma-map] ; Copy a hash-map of <buf-id => state-machine-array>.
-  (apply hash-map (mapcat (fn [[buf-id sma]] [buf-id (aclone sma)])
-                          sma-map)))
-
-(defn ago-snapshot [ago-world-now]
-  (-> ago-world-now ; The mutable sma's need explicit cloning.
-      (assoc :smas (copy-sma-map (:smas ago-world-now)))
-      (assoc :smas-new (copy-sma-map (:smas-new ago-world-now)))))
-
 (defn seqv+ [ago-world-now]
   (update-in ago-world-now [:seqv (dec (count (:seqv ago-world-now)))] inc))
 
@@ -201,4 +192,37 @@
     (protocols/close! c)
     (ago-dereg-state-machine (.-ago-world (.-buf c)) (.-buf c))
     c))
+
+; --------------------------------------------------------
+
+(defn copy-sma-map [sma-map] ; Copy a hash-map of <buf-id => state-machine-array>.
+  (apply hash-map (mapcat (fn [[buf-id sma]] [buf-id (aclone sma)])
+                          sma-map)))
+
+(defn ago-snapshot [ago-world]
+  (let [ago-world-now @ago-world]
+    (-> ago-world-now ; The mutable sma's need explicit cloning.
+        (assoc :smas (copy-sma-map (:smas ago-world-now)))
+        (assoc :smas-new (copy-sma-map (:smas-new ago-world-now))))))
+
+(defn ago-restore [ago-world snapshot]
+    (let [ss (ago-snapshot (atom snapshot)) ; Re-snapshot so snapshot stays immutable.
+          [recycled-smas reborn-smas] (ago-judge-state-machines (:bufs ss)
+                                                                (:smas ss)
+                                                                (:smas @ago-world))
+          [recycled-smasN reborn-smasN] (ago-judge-state-machines (:bufs ss)
+                                                                  (:smas-new ss)
+                                                                  (:smas-new @ago-world))]
+      (swap! ago-world
+             #(-> %
+                  (assoc :seqv (conj (:seqv ss)
+                                     ((:gen-id @ago-world)) 0)) ; Extend the seqv.
+                  (assoc :bufs (:bufs ss))
+                  (assoc :smas recycled-smas)
+                  (assoc :smas-new recycled-smasN)))
+      (doseq [[sma-old ss-buf] reborn-smas]
+        (ago-revive-state-machine ago-world sma-old ss-buf))
+      (doseq [[sma-old ss-buf] reborn-smasN]
+        (ago-revive-state-machine ago-world sma-old ss-buf))
+      ago-world))
 
