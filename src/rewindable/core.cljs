@@ -27,6 +27,7 @@
          msg)))
 
 (let [hi-ch (listen-el (gdom/getElement "hi") "click")
+      bye-ch (listen-el (gdom/getElement "bye") "click")
       stw-ch (listen-el (gdom/getElement "stw") "click") ; save-the-world button
       rtw-ch (listen-el (gdom/getElement "rtw") "click") ; restore-the-world button
       last-snapshot (atom nil)
@@ -56,22 +57,38 @@
         (ago-revive-state-machine agw sma-old ss-buf)))
     (recur))
   (ago agw
-       (loop [num-hi 0]
-         (println "num-hi" num-hi)
+       (loop [num-hi 0 num-bye 0]
+         (println "num-hi" num-hi "num-bye" num-bye)
          (println :agw @agw)
          (println :lss @last-snapshot)
-         (let [x (<! hi-ch)]
-           (>! ch1 [num-hi x])
-           (let [child-ch (child agw ch1)
-                 [num-hi2 x2] (<! child-ch)]
-             (when (not= nil (<! child-ch))
-               (println "ERROR expected closed child-ch"))
-             (when (not= nil (<! child-ch))
-               (println "ERROR expected closed child-ch"))
-             (if (or (not= x x2)
-                     (not= num-hi num-hi2))
-               (println "ERROR"
-                        "x" x "num-hi" num-hi
-                        "x2" x2 "num-hi2" num-hi2)
-               (recur (inc num-hi))))))))
+         (let [[x ch] (alts! [hi-ch bye-ch])]
+           (cond
+            (= ch hi-ch)
+            (do (>! ch1 [num-hi x])
+                (let [child-ch (child agw ch1)
+                      [num-hi2 x2] (<! child-ch)]
+                  (when (not= nil (<! child-ch))
+                    (println "ERROR expected closed child-ch"))
+                  (when (not= nil (<! child-ch))
+                    (println "ERROR expected closed child-ch"))
+                  (if (or (not= x x2)
+                          (not= num-hi num-hi2))
+                    (println "ERROR"
+                             "x" x "num-hi" num-hi
+                             "x2" x2 "num-hi2" num-hi2)
+                    (recur (inc num-hi) num-bye))))
+            (= ch bye-ch)
+            (let [child-ch (child agw ch1)]
+              (>! ch1 [num-bye x])
+              (let [[num-bye2 x2] (<! child-ch)]
+                (when (not= nil (<! child-ch))
+                  (println "ERROR expected closed child-ch bye"))
+                (when (not= nil (<! child-ch))
+                  (println "ERROR expected closed child-ch bye"))
+                (if (or (not= x x2)
+                        (not= num-bye num-bye2))
+                    (println "ERROR"
+                             "x" x "num-bye" num-bye
+                             "x2" x2 "num-bye2" num-bye2)
+                    (recur num-hi (inc num-bye))))))))))
 
