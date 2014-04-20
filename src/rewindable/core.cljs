@@ -25,37 +25,40 @@
          (println "yo" msg)
          msg)))
 
-(defn revive-smas [agw bufs-ss smas-ss smas-cur]
+(defn revive-smas [bufs-ss smas-ss smas-cur]
   (loop [ss-buf-ids (sort (keys smas-ss))
          cur-buf-ids (sort (keys smas-cur))
-         acc-nxt-smas {}]
+         acc-recycled-smas {} ; State machines shared by ss and cur.
+         acc-reborn-smas []]  ; State machines that need rebirth (were in ss only).
     (let [ss-buf-id (first ss-buf-ids)
           cur-buf-id (first cur-buf-ids)]
       (cond
-       (= nil ss-buf-id cur-buf-id) acc-nxt-smas ; Loop exit.
+       (= nil ss-buf-id cur-buf-id)
+       [acc-recycled-smas acc-reborn-smas]
 
        (and ss-buf-id ; In ss but not in cur.
             (or (nil? cur-buf-id) (< ss-buf-id cur-buf-id)))
        (recur (rest ss-buf-ids) cur-buf-ids
+              acc-recycled-smas
               (let [ss-buf (get bufs-ss ss-buf-id)
-                    sma-old (get smas-ss ss-buf-id)
-                    ; TODO: Need to pass an ago-world2 to revive.
-                    sma-new (ago-revive-state-machine agw sma-old ss-buf)]
-                (assoc acc-nxt-smas ss-buf-id sma-new)))
+                    sma-old (get smas-ss ss-buf-id)]
+                ; Later, can invoke (ago-revive-state-machine agw sma-old ss-buf).
+                (conj acc-reborn-smas [sma-old ss-buf])))
 
-       (and cur-buf-id ; In cur but not in ss.
+       (and cur-buf-id ; In cur but not in ss, so drop cur's sma.
             (or (nil? ss-buf-id) (< cur-buf-id ss-buf-id)))
        (recur ss-buf-ids (rest cur-buf-ids)
-              ; TODO: need to explicitly close cur's sma?
-              acc-nxt-smas) ; So, drop cur's sma.
+              acc-recycled-smas
+              acc-reborn-smas)
 
        (= ss-buf-id cur-buf-id) ; In both cur and ss.
        (let [sma-ss (get smas-ss ss-buf-id)
              sma-cur (get smas-cur cur-buf-id)]
-         (acopy sma-ss sma-cur) ; Rewind cur's sma.
+         (acopy sma-ss sma-cur) ; Recycle the cur's sma.
          (recur (rest ss-buf-ids)
                 (rest cur-buf-ids)
-                (assoc acc-nxt-smas cur-buf-id sma-cur)))
+                (assoc acc-recycled-smas cur-buf-id sma-cur)
+                acc-reborn-smas))
 
        :else (println "UNEXPECTED case in snapshot revive")))))
 
@@ -72,14 +75,18 @@
   (go-loop []
     (<! rtw-ch)
     (let [ss (ago-snapshot @last-snapshot)
-          smas-ss (:smas ss)
-          smas-cur (:smas @agw)
-          nxt-smas (revive-smas agw (:bufs ss) smas-ss smas-cur)]
+          [recycled-smas reborn-smas] (revive-smas (:bufs ss)
+                                                   (:smas ss) (:smas @agw))
+          [recycled-smas2 reborn-smas2] (revive-smas (:bufs ss)
+                                                     (:smas-new ss) (:smas-new @agw))]
       (swap! agw #(-> %
                       (assoc :bufs (:bufs ss))
-                      (assoc :smas nxt-smas)
-                      ; TODO: need to make new sm instances for smas-new?
-                      (assoc :smas-new (:smas-new ss)))))
+                      (assoc :smas recycled-smas)
+                      (assoc :smas-new recycled-smas2)))
+      (doseq [[sma-old ss-buf] reborn-smas]
+        (ago-revive-state-machine agw sma-old ss-buf))
+      (doseq [[sma-old ss-buf] reborn-smas2]
+        (ago-revive-state-machine agw sma-old ss-buf)))
     (recur))
   (ago agw
        (loop [num-hi 0]

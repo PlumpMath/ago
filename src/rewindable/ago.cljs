@@ -130,10 +130,10 @@
         new-sma (acopy old-sma ((aget old-sma ioc-helpers/FN-IDX))
                        ioc-helpers/STATE-IDX) ; We depend on *-IDX ordering.
         new-sma2 (ioc/aset-all! new-sma ioc-helpers/USER-START-IDX ch)]
-    (ago-reg-state-machine ~ago-world new-sma2 buf)
+    (ago-reg-state-machine ago-world new-sma2 buf)
     (dispatch/run
      (fn []
-       (ago-run-state-machine ~ago-world new-sma2 buf)
+       (ago-run-state-machine ago-world new-sma2 buf)
        (ioc-helpers/run-state-machine-wrapped new-sma2)))
     ch))
 
