@@ -29,6 +29,7 @@
 (defn make-ago-world []
   (let [last-id (atom 0)]
     (atom {:gen-id #(swap! last-id inc)
+           :seq [0]     ; Extended when a snapshot is revived (branching).
            :bufs {}     ; Keyed by buf-id.
            :smas {}     ; Keyed by buf-id, value is state-machine array.
            :smas-new {} ; Same as :smas, but for new, not yet run goroutines.
@@ -42,6 +43,9 @@
   (-> ago-world-now
       (assoc :smas (copy-sma-map (:smas ago-world-now)))
       (assoc :smas-new (copy-sma-map (:smas-new ago-world-now)))))
+
+(defn ago-world-inc-seq [ago-world]
+  (swap! ago-world #(update-in % [:seq (dec (count (:seq @ago-world)))] inc)))
 
 ; --------------------------------------------------------
 
