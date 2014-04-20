@@ -26,12 +26,6 @@
 
 ; --------------------------------------------------------
 
-(defn copy-sma-map [sma-map] ; Copy a hash-map of <buf-id => state-machine-array>.
-  (apply hash-map (mapcat (fn [[buf-id sma]] [buf-id (aclone sma)])
-                          sma-map)))
-
-; --------------------------------------------------------
-
 (defn make-ago-world []
   (let [last-id (atom 0)]
     (atom {:gen-id #(swap! last-id inc)
@@ -39,6 +33,10 @@
            :smas {}     ; Keyed by buf-id, value is state-machine array.
            :smas-new {} ; Same as :smas, but for new, not yet run goroutines.
            })))
+
+(defn copy-sma-map [sma-map] ; Copy a hash-map of <buf-id => state-machine-array>.
+  (apply hash-map (mapcat (fn [[buf-id sma]] [buf-id (aclone sma)])
+                          sma-map)))
 
 (defn ago-snapshot [ago-world-now]
   (-> ago-world-now
