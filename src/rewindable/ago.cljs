@@ -29,7 +29,7 @@
 (defn make-ago-world []
   (let [last-id (atom 0)]
     (atom {:gen-id #(swap! last-id inc)
-           :seq [0]     ; Extended when a snapshot is revived (branching).
+           :seqv [0]    ; Sequence numbers, grown when snapshot revived/branched.
            :bufs {}     ; Keyed by buf-id.
            :smas {}     ; Keyed by buf-id, value is state-machine array.
            :smas-new {} ; Same as :smas, but for new, not yet run goroutines.
@@ -40,12 +40,12 @@
                           sma-map)))
 
 (defn ago-snapshot [ago-world-now]
-  (-> ago-world-now
+  (-> ago-world-now ; The mutable sma's need explicit cloning.
       (assoc :smas (copy-sma-map (:smas ago-world-now)))
       (assoc :smas-new (copy-sma-map (:smas-new ago-world-now)))))
 
-(defn ago-world-inc-seq [ago-world]
-  (swap! ago-world #(update-in % [:seq (dec (count (:seq @ago-world)))] inc)))
+(defn seqv+ [ago-world-now]
+  (update-in ago-world-now [:seqv (dec (count (:seqv ago-world-now)))] inc))
 
 ; --------------------------------------------------------
 
@@ -58,13 +58,13 @@
   (pop [_]
     ; Assumes nil is not a valid buffer item.
     (when-let [x (last (get-in @ago-world [:bufs buf-id]))]
-      (swap! ago-world #(update-in % [:bufs buf-id] drop-last))
+      (swap! ago-world #(seqv+ (update-in % [:bufs buf-id] drop-last)))
       (when (empty? (get-in @ago-world [:bufs buf-id]))
-        (swap! ago-world #(dissoc-in % [:bufs buf-id])))
+        (swap! ago-world #(seqv+ (dissoc-in % [:bufs buf-id]))))
       x))
 
   (unshift [_ x]
-    (swap! ago-world #(update-in % [:bufs buf-id] conj x))
+    (swap! ago-world #(seqv+ (update-in % [:bufs buf-id] conj x)))
     nil)
 
   (unbounded-unshift [this x] ; From RingBuffer 'interface'.
@@ -73,7 +73,8 @@
   (resize [_] nil) ; From RingBuffer 'interface'.
 
   (cleanup [_ keep?]
-    (swap! ago-world #(update-in % [:bufs buf-id] (fn [xs] (filter keep? xs)))))
+    (swap! ago-world #(seqv+ (update-in % [:bufs buf-id]
+                                        (fn [xs] (filter keep? xs))))))
 
   protocols/Buffer
   (full? [this]
@@ -117,17 +118,19 @@
 ; --------------------------------------------------------
 
 (defn ago-reg-state-machine [ago-world state-machine-arr buf]
-  (swap! ago-world #(assoc-in % [:smas-new (.-buf-id buf)] state-machine-arr)))
+  (swap! ago-world #(seqv+ (assoc-in % [:smas-new (.-buf-id buf)] state-machine-arr))))
 
 (defn ago-run-state-machine [ago-world state-machine-arr buf]
   (swap! ago-world #(-> %
                         (dissoc-in [:smas-new (.-buf-id buf)])
-                        (assoc-in [:smas (.-buf-id buf)] state-machine-arr))))
+                        (assoc-in [:smas (.-buf-id buf)] state-machine-arr)
+                        (seqv+))))
 
 (defn ago-dereg-state-machine [ago-world buf]
   (swap! ago-world #(-> %
                         (dissoc-in [:smas-new (.-buf-id buf)])
-                        (dissoc-in [:smas (.-buf-id buf)]))))
+                        (dissoc-in [:smas (.-buf-id buf)])
+                        (seqv+))))
 
 (defn ago-revive-state-machine [ago-world old-sma buf]
   (let [ch (rewindable.ago/ago-chan-buf ago-world buf)
