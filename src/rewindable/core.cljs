@@ -25,6 +25,13 @@
          (println "yo" msg)
          msg)))
 
+(defn child2 [agw in-ch]
+  (ago agw
+       (loop [yas 0]
+         (println "ya0" yas (<! in-ch))
+         (println "ya1" yas (<! in-ch))
+         (recur (inc yas)))))
+
 (let [hi-ch (listen-el (gdom/getElement "hi") "click")
       bye-ch (listen-el (gdom/getElement "bye") "click")
       fie-ch (listen-el (gdom/getElement "fie") "click")
@@ -32,7 +39,8 @@
       rtw-ch (listen-el (gdom/getElement "rtw") "click") ; restore-the-world button
       last-snapshot (atom nil)
       agw (make-ago-world)
-      ch1 (ago-chan agw 1)]
+      ch1 (ago-chan agw 1)
+      ch2 (ago-chan agw 2)]
   (go-loop []
     (<! stw-ch)
     (reset! last-snapshot (ago-snapshot agw))
@@ -45,7 +53,6 @@
        (loop [num-hi 0 num-bye 0]
          (println "num-hi" num-hi "num-bye" num-bye)
          (println :agw @agw)
-         (println :lss @last-snapshot)
          (let [[x ch] (alts! [hi-ch bye-ch])]
            (cond
             (= ch hi-ch)
@@ -80,7 +87,8 @@
        (loop [num-fie 0]
          (println "num-fie" num-fie)
          (println :agw @agw)
-         (println :lss @last-snapshot)
+         (>! ch2 [:fie num-fie])
+         (>! ch2 [:foe num-fie])
          (let [[x ch] (alts! [fie-ch])]
            (cond
             (= ch fie-ch)
@@ -96,5 +104,6 @@
                     (println "ERROR"
                              "x" x "num-fie" num-fie
                              "x2" x2 "num-fie2" num-fie2)
-                    (recur (inc num-fie))))))))))
+                    (recur (inc num-fie)))))))))
+  (child2 agw ch2))
 
