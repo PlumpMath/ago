@@ -1,6 +1,7 @@
 ;; Custom SSA terminators to CLJS core async.
 
 (ns rewindable.ago
+  (:require-macros [cljs.core.async.impl.ioc-macros :as ioc-macros])
   (:require [cljs.core.async.impl.ioc-helpers :as ioc-helpers]
             [cljs.core.async.impl.buffers :as buffers]
             [cljs.core.async.impl.channels :as channels]
@@ -176,8 +177,23 @@
 
 ; --------------------------------------------------------
 
+(defn fn-handler [f]
+  (reify
+    protocols/Handler
+    (active? [_] true)
+    (commit [_] f)))
+
 (defn ago-take [state blk ^not-native c]
-  (cljs.core.async.impl.ioc-helpers/take! state blk c))
+  (if-let [cb (protocols/take!
+               c (fn-handler
+                  (fn [x]
+                    (ioc-macros/aset-all! state ioc-helpers/VALUE-IDX
+                                          x ioc-helpers/STATE-IDX blk)
+                    (ioc-helpers/run-state-machine-wrapped state))))]
+    (do (ioc-macros/aset-all! state ioc-helpers/VALUE-IDX
+                              @cb ioc-helpers/STATE-IDX blk)
+        :recur)
+    nil))
 
 (defn ago-put [state blk ^not-native c val]
   (cljs.core.async.impl.ioc-helpers/put! state blk c val))
