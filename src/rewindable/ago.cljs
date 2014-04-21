@@ -44,7 +44,7 @@
 ; CLJS/core.async's default mutable RingBuffer, so that we can easily
 ; take ago-world snapshots.  Note: we have an unused length property
 ; in order to keep ManyToManyChannel happy.
-(deftype FifoBuffer [ago-world buf-id length max-length]
+(deftype FifoBuffer [ago-world seqv buf-id length max-length]
   Object
   (pop [_]
     ; Assumes nil is not a valid buffer item.
@@ -81,7 +81,7 @@
     (count (get-in @ago-world [:bufs buf-id]))))
 
 (defn fifo-buffer [ago-world buf-id max-length]
-  (FifoBuffer. ago-world buf-id -123 max-length))
+  (FifoBuffer. ago-world (:seqv @ago-world) buf-id -123 max-length))
 
 ; --------------------------------------------------------
 
