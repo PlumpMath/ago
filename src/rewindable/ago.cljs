@@ -107,6 +107,9 @@
                                     buf-or-n)
                        buf-or-n)))))
 
+(defn chan-to-ago-world [ch]
+  (.-ago-world (.-takes ch)))
+
 ; --------------------------------------------------------
 
 (defn ago-reg-state-machine [ago-world state-machine-arr buf]
@@ -223,7 +226,7 @@
     (when-not (nil? value)
       (protocols/put! c value (ioc-helpers/fn-handler (fn [] nil))))
     (protocols/close! c)
-    (ago-dereg-state-machine (.-ago-world (.-buf c)) (.-buf c))
+    (ago-dereg-state-machine (chan-to-ago-world c) (.-buf c))
     c))
 
 ; --------------------------------------------------------
