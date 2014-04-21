@@ -107,7 +107,10 @@
                                     buf-or-n)
                        buf-or-n)))))
 
-(defn chan-to-ago-world [ch]
+(defn chan-segv [ch]
+  (.-segv (.-takes ch)))
+
+(defn chan-ago-world [ch]
   (.-ago-world (.-takes ch)))
 
 ; --------------------------------------------------------
@@ -180,40 +183,58 @@
 
 ; --------------------------------------------------------
 
-(defn fn-handler [f]
+(defn fn-handler [active-cb f]
   (reify
     protocols/Handler
-    (active? [_] true)
-    (commit [_] f)))
+    (active? [_] (active-cb))
+    (commit [_] (when (active-cb) f))))
+
+(defn compare-segvs [segv-x segv-y]
+  (loop [xs segv-x
+         ys segv-y]
+    (let [x (first xs)
+          y (first ys)]
+      (cond (= nil x y) 0
+            (nil? x) 1
+            (nil? y) -1
+            (= x y) (recur (rest xs) (rest ys))
+            :else (- x y)))))
 
 (defn ago-take [state blk ^not-native c]
-  (if-let [cb (protocols/take!
-               c (fn-handler
-                  (fn [x]
-                    (ioc-macros/aset-all! state ioc-helpers/VALUE-IDX
-                                          x ioc-helpers/STATE-IDX blk)
-                    (ioc-helpers/run-state-machine-wrapped state))))]
-    (do (ioc-macros/aset-all! state ioc-helpers/VALUE-IDX
-                              @cb ioc-helpers/STATE-IDX blk)
-        :recur)
-    nil))
+  (let [active? #(<= (compare-segvs (chan-segv c) (:segv @(chan-ago-world c))) 0)]
+    (if-let [cb (protocols/take!
+                 c (fn-handler
+                    active?
+                    (fn [x]
+                      (when (active?)
+                        (ioc-macros/aset-all! state ioc-helpers/VALUE-IDX
+                                              x ioc-helpers/STATE-IDX blk)
+                        (ioc-helpers/run-state-machine-wrapped state)))))]
+      (do (ioc-macros/aset-all! state ioc-helpers/VALUE-IDX
+                                @cb ioc-helpers/STATE-IDX blk)
+          :recur)
+      nil)))
 
 (defn ago-put [state blk ^not-native c val]
-  (if-let [cb (protocols/put!
-               c val (fn-handler
-                      (fn [ret-val]
-                        (ioc-macros/aset-all! state ioc-helpers/VALUE-IDX
-                                              ret-val ioc-helpers/STATE-IDX blk)
-                        (ioc-helpers/run-state-machine-wrapped state))))]
-    (do (ioc-macros/aset-all! state ioc-helpers/VALUE-IDX
-                              @cb ioc-helpers/STATE-IDX blk)
-        :recur)
-    nil))
+  (let [active? #(<= (compare-segvs (chan-segv c) (:segv @(chan-ago-world c))) 0)]
+    (if-let [cb (protocols/put!
+                 c val (fn-handler
+                        active?
+                        (fn [ret-val]
+                          (when (active?)
+                            (ioc-macros/aset-all! state ioc-helpers/VALUE-IDX
+                                                  ret-val ioc-helpers/STATE-IDX blk)
+                            (ioc-helpers/run-state-machine-wrapped state)))))]
+      (do (ioc-macros/aset-all! state ioc-helpers/VALUE-IDX
+                                @cb ioc-helpers/STATE-IDX blk)
+          :recur)
+      nil)))
 
 (defn ago-alts [state cont-block ports & {:as opts}]
   (ioc-macros/aset-all! state ioc-helpers/STATE-IDX cont-block)
   (when-let [cb (cljs.core.async/do-alts
                  (fn [val]
+                   ; TODO: Might get pre-born effects here?
                    (ioc-macros/aset-all! state ioc-helpers/VALUE-IDX val)
                    (ioc-helpers/run-state-machine-wrapped state))
                  ports
@@ -222,11 +243,14 @@
     :recur))
 
 (defn ago-return-chan [state value]
-  (let [^not-native c (aget state ioc-helpers/USER-START-IDX)]
-    (when-not (nil? value)
-      (protocols/put! c value (ioc-helpers/fn-handler (fn [] nil))))
-    (protocols/close! c)
-    (ago-dereg-state-machine (chan-to-ago-world c) (.-buf c))
+  (let [^not-native c (aget state ioc-helpers/USER-START-IDX)
+        ago-world (chan-ago-world c)
+        active? #(<= (compare-segvs (chan-segv c) (:segv @ago-world)) 0)]
+    (when (active?)
+      (when-not (nil? value)
+        (protocols/put! c value (fn-handler active? (fn [] nil))))
+      (protocols/close! c))
+    (ago-dereg-state-machine ago-world (.-buf c))
     c))
 
 ; --------------------------------------------------------
