@@ -39,6 +39,20 @@
 (defn seqv+ [ago-world-now]
   (update-in ago-world-now [:seqv (dec (count (:seqv ago-world-now)))] inc))
 
+(defn compare-segvs [segv-x segv-y]
+  (loop [xs segv-x
+         ys segv-y]
+    (let [x (first xs)
+          y (first ys)]
+      (cond (= nil x y) 0
+            (nil? x) 1 ; Normal compare handles length mismatches wrong.
+            (nil? y) -1
+            (= x y) (recur (rest xs) (rest ys))
+            :else (- x y)))))
+
+(defn segv-alive? [ago-world segv]
+  (<= (compare-segvs segv (:segv @ago-world)) 0))
+
 ; --------------------------------------------------------
 
 ; Persistent/immutable buffer implementation as an alternative to
@@ -189,19 +203,8 @@
     (active? [_] (active-cb))
     (commit [_] (when (active-cb) f))))
 
-(defn compare-segvs [segv-x segv-y]
-  (loop [xs segv-x
-         ys segv-y]
-    (let [x (first xs)
-          y (first ys)]
-      (cond (= nil x y) 0
-            (nil? x) 1
-            (nil? y) -1
-            (= x y) (recur (rest xs) (rest ys))
-            :else (- x y)))))
-
 (defn ago-take [state blk ^not-native c]
-  (let [active? #(<= (compare-segvs (chan-segv c) (:segv @(chan-ago-world c))) 0)]
+  (let [active? #(segv-alive? (chan-ago-world c) (chan-segv c))]
     (if-let [cb (protocols/take!
                  c (fn-handler
                     active?
@@ -216,7 +219,7 @@
       nil)))
 
 (defn ago-put [state blk ^not-native c val]
-  (let [active? #(<= (compare-segvs (chan-segv c) (:segv @(chan-ago-world c))) 0)]
+  (let [active? #(segv-alive? (chan-ago-world c) (chan-segv c))]
     (if-let [cb (protocols/put!
                  c val (fn-handler
                         active?
@@ -245,7 +248,7 @@
 (defn ago-return-chan [state value]
   (let [^not-native c (aget state ioc-helpers/USER-START-IDX)
         ago-world (chan-ago-world c)
-        active? #(<= (compare-segvs (chan-segv c) (:segv @ago-world)) 0)]
+        active? #(segv-alive? ago-world (chan-segv c))]
     (when (active?)
       (when-not (nil? value)
         (protocols/put! c value (fn-handler active? (fn [] nil))))
@@ -285,4 +288,3 @@
       (doseq [[sma-old ss-buf] reborn-smasN]
         (ago-revive-state-machine ago-world sma-old ss-buf))
       ago-world))
-
