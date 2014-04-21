@@ -196,10 +196,27 @@
     nil))
 
 (defn ago-put [state blk ^not-native c val]
-  (cljs.core.async.impl.ioc-helpers/put! state blk c val))
+  (if-let [cb (protocols/put!
+               c val (fn-handler
+                      (fn [ret-val]
+                        (ioc-macros/aset-all! state ioc-helpers/VALUE-IDX
+                                              ret-val ioc-helpers/STATE-IDX blk)
+                        (ioc-helpers/run-state-machine-wrapped state))))]
+    (do (ioc-macros/aset-all! state ioc-helpers/VALUE-IDX
+                              @cb ioc-helpers/STATE-IDX blk)
+        :recur)
+    nil))
 
-(defn ago-alts [state cont-block ports & rest]
-  (apply cljs.core.async.impl.ioc-helpers/ioc-alts! state cont-block ports rest))
+(defn ago-alts [state cont-block ports & {:as opts}]
+  (ioc-macros/aset-all! state ioc-helpers/STATE-IDX cont-block)
+  (when-let [cb (cljs.core.async/do-alts
+                 (fn [val]
+                   (ioc-macros/aset-all! state ioc-helpers/VALUE-IDX val)
+                   (ioc-helpers/run-state-machine-wrapped state))
+                 ports
+                 opts)]
+    (ioc-macros/aset-all! state ioc-helpers/VALUE-IDX @cb)
+    :recur))
 
 (defn ago-return-chan [state value]
   (let [^not-native c (aget state ioc-helpers/USER-START-IDX)]
