@@ -25,6 +25,8 @@
       m)
     (dissoc m k)))
 
+(defn now [] (.now js/Date))
+
 ; --------------------------------------------------------
 
 (defn make-ago-world []
@@ -34,6 +36,8 @@
            :bufs {}     ; Keyed by buf-id.
            :smas {}     ; Keyed by buf-id, value is state-machine array.
            :smas-new {} ; Same as :smas, but for new, not yet run goroutines.
+           :logical-ms 0      ; Logical time/msecs, which is always updated
+           :physical-ms (now) ; at the same time as physical-ms time snapshot.
            })))
 
 (defn seqv+ [ago-world-now]
