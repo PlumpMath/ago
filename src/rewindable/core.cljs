@@ -89,21 +89,19 @@
          (println :agw @agw)
          (>! ch2 [:fie num-fie])
          (>! ch2 [:foe num-fie])
-         (let [[x ch] (alts! [fie-ch])]
-           (cond
-            (= ch fie-ch)
-            (do (>! ch1 [num-fie x])
-                (let [child-ch (child agw ch1)
-                      [num-fie2 x2] (<! child-ch)]
-                  (when (not= nil (<! child-ch))
-                    (println "ERROR expected closed child-ch"))
-                  (when (not= nil (<! child-ch))
-                    (println "ERROR expected closed child-ch"))
-                  (if (or (not= x x2)
-                          (not= num-fie num-fie2))
-                    (println "ERROR"
-                             "x" x "num-fie" num-fie
-                             "x2" x2 "num-fie2" num-fie2)
-                    (recur (inc num-fie)))))))))
+         (let [x (<! fie-ch)]
+           (>! ch1 [num-fie x])
+           (let [child-ch (child agw ch1)
+                 [num-fie2 x2] (<! child-ch)]
+             (when (not= nil (<! child-ch))
+               (println "ERROR expected closed child-ch"))
+             (when (not= nil (<! child-ch))
+               (println "ERROR expected closed child-ch"))
+             (if (or (not= x x2)
+                     (not= num-fie num-fie2))
+               (println "ERROR"
+                        "x" x "num-fie" num-fie
+                        "x2" x2 "num-fie2" num-fie2)
+               (recur (inc num-fie)))))))
   (child2 agw ch2))
 

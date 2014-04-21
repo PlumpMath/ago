@@ -55,7 +55,9 @@
             :else (- x y)))))
 
 (defn segv-alive? [ago-world segv]
-  (<= (compare-segvs segv (:segv @ago-world)) 0))
+  (if (and ago-world segv)
+    (<= (compare-segvs segv (:segv @ago-world)) 0)
+    true)) ; Not an ago managed thing, so assume it's alive.
 
 ; --------------------------------------------------------
 
@@ -126,10 +128,12 @@
                        buf-or-n)))))
 
 (defn chan-segv [ch]
-  (.-segv (.-takes ch)))
+  (when (instance? FifoBuffer (.-takes ch))
+    (.-segv (.-takes ch))))
 
 (defn chan-ago-world [ch]
-  (.-ago-world (.-takes ch)))
+  (when (instance? FifoBuffer (.-takes ch))
+    (.-ago-world (.-takes ch))))
 
 ; --------------------------------------------------------
 
@@ -241,9 +245,10 @@
   (ioc-macros/aset-all! state ioc-helpers/STATE-IDX cont-block)
   (when-let [cb (cljs.core.async/do-alts
                  (fn [val]
-                   ; TODO: Might get pre-born effects here?
-                   (ioc-macros/aset-all! state ioc-helpers/VALUE-IDX val)
-                   (ioc-helpers/run-state-machine-wrapped state))
+                   (let [[v c] val]
+                     (when (segv-alive? (chan-ago-world c) (chan-segv c))
+                       (ioc-macros/aset-all! state ioc-helpers/VALUE-IDX val)
+                       (ioc-helpers/run-state-machine-wrapped state))))
                  ports
                  opts)]
     (ioc-macros/aset-all! state ioc-helpers/VALUE-IDX @cb)
