@@ -38,6 +38,7 @@
            :smas-new {} ; Same as :smas, but for new, not yet run goroutines.
            :logical-ms 0      ; Logical time/msecs, which is always updated
            :physical-ms (now) ; at the same time as physical-ms time snapshot.
+           :timeouts (sorted-map) ; Keyed by logical-ms => '(timeout-ch ...).
            })))
 
 (defn seqv+ [ago-world-now]
@@ -106,11 +107,14 @@
 
 ; --------------------------------------------------------
 
-(defn ago-chan-buf [ago-world buf]
-  (channels/ManyToManyChannel.
-   (fifo-buffer ago-world (str (.-buf-id buf) "-takes") -1) 0
-   (fifo-buffer ago-world (str (.-buf-id buf) "-puts") -1) 0
-   buf false))
+(defn ago-chan-buf [ago-world buf & default-buf-id]
+  (let [buf-id (if buf
+                 (.-buf-id buf)
+                 (or (first default-buf-id) "unknown"))]
+    (channels/ManyToManyChannel.
+     (fifo-buffer ago-world (str buf-id "-takes") -1) 0
+     (fifo-buffer ago-world (str buf-id "-puts") -1) 0
+     buf false)))
 
 (defn ago-chan
   "Creates a channel with an optional buffer. If buf-or-n is a
@@ -291,9 +295,41 @@
                   (assoc :seqv (conj (:seqv ss) branch-id 0))
                   (assoc :bufs (:bufs ss))
                   (assoc :smas recycled-smas)
-                  (assoc :smas-new recycled-smasN)))
+                  (assoc :smas-new recycled-smasN)
+                  (assoc :physical-ms (now))))
       (doseq [[sma-old ss-buf] reborn-smas]
         (ago-revive-state-machine ago-world sma-old ss-buf))
       (doseq [[sma-old ss-buf] reborn-smasN]
         (ago-revive-state-machine ago-world sma-old ss-buf))
       ago-world))
+
+; --------------------------------------------------------
+
+(def curr-js-timeout-id (atom nil)) ; Value is nil or js-timeout-id.
+
+(defn timeout-handler [ago-world]
+  (swap! curr-js-timeout-id (fn [x]
+                              (when x (js/cancelTimeout x))
+                              nil))
+  (let [logical-ms (:logical-ms @ago-world)
+        timeouts2 (loop [timeouts (:timeouts @ago-world)]
+                    (if-let [[soonest-ms chs] (first timeouts)]
+                      (if (<= soonest-ms logical-ms)
+                        (do :fire-any-still-active-chs
+                            (recur (dissoc timeouts soonest-ms)))
+                        timeouts)))]
+    (when-let [[soonest-ms chs] (first timeouts2)]
+      (reset! curr-js-timeout-id
+              (js/setTimeout #(timeout-handler ago-world)
+                             (- soonest-ms logical-ms))))
+    (swap! ago-world #(assoc % :timeouts timeouts2))))
+
+(defn ago-timeout [ago-world delay-ms] ; Logical milliseconds from now.
+  (let [timeout-at (+ delay-ms (:logical-ms @ago-world))
+        timeout-ch (ago-chan-buf ago-world nil (str "timeout-" ((:gen-id @ago-world))))]
+    (swap! ago-world
+           #(update-in % [:timeouts]
+                       (fn [m] (assoc m timeout-at
+                                      (conj (get-in % [:timeouts timeout-at])
+                                            timeout-ch)))))
+    (timeout-handler ago-world)))
