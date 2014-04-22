@@ -47,7 +47,15 @@
            })))
 
 (defn seqv+ [ago-world-now]
-  (update-in ago-world-now [:seqv (dec (count (:seqv ago-world-now)))] inc))
+  (if (zero? (:logical-speed ago-world-now)) ; Zero check avoids seqv inc.
+    ago-world-now
+    (let [t (now)]
+      (-> ago-world-now
+          (update-in [:seqv (dec (count (:seqv ago-world-now)))] inc)
+          (update-in [:logical-ms]
+                     (fn [prev] (+ prev (* (- t (:physical-ms ago-world-now))
+                                           (:logical-speed ago-world-now)))))
+          (assoc :physical-ms t)))))
 
 (defn compare-seqvs [seqv-x seqv-y]
   (loop [xs seqv-x
@@ -131,8 +139,7 @@
                       buf-or-n)]
        (ago-chan-buf ago-world
                      (if (number? buf-or-n)
-                       (fifo-buffer ago-world
-                                    (str "ch-" ((:gen-id @ago-world)))
+                       (fifo-buffer ago-world (str "ch-" ((:gen-id @ago-world)))
                                     buf-or-n)
                        buf-or-n)))))
 
@@ -301,6 +308,7 @@
                   (assoc :bufs (:bufs ss))
                   (assoc :smas recycled-smas)
                   (assoc :smas-new recycled-smasN)
+                  (assoc :logical-ms (:logical-ms ss))
                   (assoc :physical-ms (now))))
       (doseq [[sma-old ss-buf] reborn-smas]
         (ago-revive-state-machine ago-world sma-old ss-buf))
@@ -313,6 +321,7 @@
 (def curr-js-timeout-id (atom nil)) ; Value is nil or js-timeout-id.
 
 (defn timeout-handler [ago-world]
+  (swap! ago-world seqv+) ; Updates logical-ms.
   (swap! curr-js-timeout-id (fn [x]
                               (when x (js/cancelTimeout x))
                               nil))

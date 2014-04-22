@@ -37,7 +37,7 @@
       stw-ch (listen-el (gdom/getElement "stw") "click") ; save-the-world button
       rtw-ch (listen-el (gdom/getElement "rtw") "click") ; restore-the-world button
       last-snapshot (atom nil)
-      agw (make-ago-world)
+      agw (make-ago-world nil)
       ch1 (ago-chan agw 1)
       ch2 (ago-chan agw 2)]
   (go-loop []
