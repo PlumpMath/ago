@@ -2,13 +2,13 @@
   (:require [cljs.core.async.impl.ioc-macros :as ioc]))
 
 (def my-async-terminators
-  {'<!                    'ago.core/ago-take
-   'cljs.core.async/<!    'ago.core/ago-take
-   '>!                    'ago.core/ago-put
-   'cljs.core.async/>!    'ago.core/ago-put
-   'alts!                 'ago.core/ago-alts
-   'cljs.core.async/alts! 'ago.core/ago-alts
-   :Return                'ago.core/ago-return-chan})
+  {'<!                    'ago.core/ssa-take
+   'cljs.core.async/<!    'ago.core/ssa-take
+   '>!                    'ago.core/ssa-put
+   'cljs.core.async/>!    'ago.core/ssa-put
+   'alts!                 'ago.core/ssa-alts
+   'cljs.core.async/alts! 'ago.core/ssa-alts
+   :Return                'ago.core/ssa-return-chan})
 
 (defmacro ago [ago-world & body]
   (let [sm (ioc/state-machine body 1 &env my-async-terminators)]

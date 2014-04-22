@@ -218,7 +218,7 @@
     (active? [_] (active-cb))
     (commit [_] (when (active-cb) f))))
 
-(defn ago-take [state blk ^not-native c]
+(defn ssa-take [state blk ^not-native c]
   (let [active? #(seqv-alive? (chan-ago-world c) (chan-seqv c))]
     (if-let [cb (protocols/take!
                  c (fn-handler
@@ -233,7 +233,7 @@
           :recur)
       nil)))
 
-(defn ago-put [state blk ^not-native c val]
+(defn ssa-put [state blk ^not-native c val]
   (let [active? #(seqv-alive? (chan-ago-world c) (chan-seqv c))]
     (if-let [cb (protocols/put!
                  c val (fn-handler
@@ -248,7 +248,7 @@
           :recur)
       nil)))
 
-(defn ago-alts [state cont-block ports & {:as opts}]
+(defn ssa-alts [state cont-block ports & {:as opts}]
   (ioc-macros/aset-all! state ioc-helpers/STATE-IDX cont-block)
   (when-let [cb (cljs.core.async/do-alts
                  (fn [val]
@@ -261,7 +261,7 @@
     (ioc-macros/aset-all! state ioc-helpers/VALUE-IDX @cb)
     :recur))
 
-(defn ago-return-chan [state value]
+(defn ssa-return-chan [state value]
   (let [^not-native c (aget state ioc-helpers/USER-START-IDX)
         ago-world (chan-ago-world c)
         active? #(seqv-alive? ago-world (chan-seqv c))]
@@ -332,9 +332,9 @@
   (let [timeout-at (+ delay-ms (:logical-ms @ago-world))
         timeout-ch (ago-chan-buf ago-world nil
                                  (str "timeout-" ((:gen-id @ago-world))))]
-    (swap! ago-world
-           #(update-in % [:timeouts]
-                       (fn [m] (assoc m timeout-at
+    (swap! ago-world                               ; Persistent sorted-map for
+           #(update-in % [:timeouts]               ; timeouts instead of skip-list
+                       (fn [m] (assoc m timeout-at ; to provide snapshot'ability.
                                       (conj (get-in % [:timeouts timeout-at])
                                             timeout-ch)))))
     (timeout-handler ago-world)))
