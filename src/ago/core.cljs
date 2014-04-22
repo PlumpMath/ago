@@ -32,13 +32,15 @@
 
 ; --------------------------------------------------------
 
-(defn make-ago-world []
+(defn make-ago-world [app-data]
   (let [last-id (atom 0)]
-    (atom {:gen-id #(swap! last-id inc)
-           :seqv [0]    ; Sequence numbers, grown when snapshot revived/branched.
-           :bufs {}     ; Keyed by buf-id.
-           :smas {}     ; Keyed by buf-id, value is state-machine array.
-           :smas-new {} ; Same as :smas, but for new, not yet run goroutines.
+    (atom {:app-data app-data ; For application-specific needs.
+           :gen-id #(swap! last-id inc) ; Unique even across snapshots.
+           :seqv [0]          ; An seqv vector is grown during a restore.
+           :bufs {}           ; Keyed by buf-id, value is FifoBuffer.
+           :smas {}           ; Keyed by buf-id, value is state-machine array.
+           :smas-new {}       ; Like :smas, but for new, not yet run goroutines.
+           :logical-speed 1.0 ; Logical-speed * physical-delta = logical-delta.
            :logical-ms 0      ; Logical time/msecs, which is always updated
            :physical-ms (now) ; at the same time as physical-ms time snapshot.
            :timeouts (sorted-map) ; Keyed by logical-ms => '(timeout-ch ...).
