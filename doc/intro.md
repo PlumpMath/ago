@@ -1,3 +1,3 @@
-# Introduction to rewindable
+# Introduction to ago
 
 TODO: write [great documentation](http://jacobian.org/writing/great-documentation/what-to-write/)

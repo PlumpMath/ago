@@ -4,7 +4,7 @@
 /out
 pom.xml
 pom.xml.asc
-rewindable.js
+ago.js
 *.jar
 *.class
 /.lein-*

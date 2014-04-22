@@ -1,6 +1,6 @@
-(ns rewindable.core-test
+(ns ago.core-test
   (:require [clojure.test :refer :all]
-            [rewindable.core :refer :all]))
+            [ago.core :refer :all]))
 
 (deftest a-test
   (testing "FIXME, I fail."

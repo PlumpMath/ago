@@ -1,4 +1,4 @@
-(defproject rewindable "0.1.0-SNAPSHOT"
+(defproject ago "0.1.0-SNAPSHOT"
   :description "FIXME: write description"
   :url "http://example.com/FIXME"
 
@@ -14,14 +14,14 @@
   :source-paths ["src"]
 
   :cljsbuild {
-    :builds [{:id "rewindable"
+    :builds [{:id "ago"
               :source-paths ["src"]
               :compiler {
-                :output-to "rewindable.js"
+                :output-to "ago.js"
                 :output-dir "out"
                 :optimizations :none
                 :source-map true}}]}
 
-  :main ^:skip-aot rewindable.core
+  :main ^:skip-aot ago.test
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all}})
