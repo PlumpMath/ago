@@ -44,9 +44,9 @@
 (defn seqv+ [ago-world-now]
   (update-in ago-world-now [:seqv (dec (count (:seqv ago-world-now)))] inc))
 
-(defn compare-segvs [segv-x segv-y]
-  (loop [xs segv-x
-         ys segv-y]
+(defn compare-seqvs [seqv-x seqv-y]
+  (loop [xs seqv-x
+         ys seqv-y]
     (let [x (first xs)
           y (first ys)]
       (cond (= nil x y) 0
@@ -55,9 +55,9 @@
             (= x y) (recur (rest xs) (rest ys))
             :else (- x y)))))
 
-(defn segv-alive? [ago-world segv]
-  (if (and ago-world segv)
-    (<= (compare-segvs segv (:segv @ago-world)) 0)
+(defn seqv-alive? [ago-world seqv]
+  (if (and ago-world seqv)
+    (<= (compare-seqvs seqv (:seqv @ago-world)) 0)
     true)) ; Not an ago managed thing, so assume it's alive.
 
 ; --------------------------------------------------------
@@ -131,9 +131,9 @@
                                     buf-or-n)
                        buf-or-n)))))
 
-(defn chan-segv [ch]
+(defn chan-seqv [ch]
   (when (instance? FifoBuffer (.-takes ch))
-    (.-segv (.-takes ch))))
+    (.-seqv (.-takes ch))))
 
 (defn chan-ago-world [ch]
   (when (instance? FifoBuffer (.-takes ch))
@@ -216,7 +216,7 @@
     (commit [_] (when (active-cb) f))))
 
 (defn ago-take [state blk ^not-native c]
-  (let [active? #(segv-alive? (chan-ago-world c) (chan-segv c))]
+  (let [active? #(seqv-alive? (chan-ago-world c) (chan-seqv c))]
     (if-let [cb (protocols/take!
                  c (fn-handler
                     active?
@@ -231,7 +231,7 @@
       nil)))
 
 (defn ago-put [state blk ^not-native c val]
-  (let [active? #(segv-alive? (chan-ago-world c) (chan-segv c))]
+  (let [active? #(seqv-alive? (chan-ago-world c) (chan-seqv c))]
     (if-let [cb (protocols/put!
                  c val (fn-handler
                         active?
@@ -250,7 +250,7 @@
   (when-let [cb (cljs.core.async/do-alts
                  (fn [val]
                    (let [[v c] val]
-                     (when (segv-alive? (chan-ago-world c) (chan-segv c))
+                     (when (seqv-alive? (chan-ago-world c) (chan-seqv c))
                        (ioc-macros/aset-all! state ioc-helpers/VALUE-IDX val)
                        (ioc-helpers/run-state-machine-wrapped state))))
                  ports
@@ -261,7 +261,7 @@
 (defn ago-return-chan [state value]
   (let [^not-native c (aget state ioc-helpers/USER-START-IDX)
         ago-world (chan-ago-world c)
-        active? #(segv-alive? ago-world (chan-segv c))]
+        active? #(seqv-alive? ago-world (chan-seqv c))]
     (when (active?)
       (when-not (nil? value)
         (protocols/put! c value (fn-handler active? (fn [] nil))))
@@ -315,7 +315,8 @@
         timeouts2 (loop [timeouts (:timeouts @ago-world)]
                     (if-let [[soonest-ms chs] (first timeouts)]
                       (if (<= soonest-ms logical-ms)
-                        (do :fire-any-still-active-chs
+                        (do (doseq [ch chs]
+                              (protocols/close! ch))
                             (recur (dissoc timeouts soonest-ms)))
                         timeouts)))]
     (when-let [[soonest-ms chs] (first timeouts2)]
@@ -326,7 +327,8 @@
 
 (defn ago-timeout [ago-world delay-ms] ; Logical milliseconds from now.
   (let [timeout-at (+ delay-ms (:logical-ms @ago-world))
-        timeout-ch (ago-chan-buf ago-world nil (str "timeout-" ((:gen-id @ago-world))))]
+        timeout-ch (ago-chan-buf ago-world nil
+                                 (str "timeout-" ((:gen-id @ago-world))))]
     (swap! ago-world
            #(update-in % [:timeouts]
                        (fn [m] (assoc m timeout-at

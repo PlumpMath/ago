@@ -28,7 +28,7 @@
        (rewindable.ago/ago-reg-state-machine ~ago-world sma2# b#)
        (cljs.core.async.impl.dispatch/run
         (fn []
-          (when (rewindable.ago/segv-alive? ~ago-world (rewindable.ago/chan-segv c#))
+          (when (rewindable.ago/seqv-alive? ~ago-world (rewindable.ago/chan-seqv c#))
             (rewindable.ago/ago-run-state-machine ~ago-world sma2# b#)
             (cljs.core.async.impl.ioc-helpers/run-state-machine-wrapped sma2#))))
        c#)))
