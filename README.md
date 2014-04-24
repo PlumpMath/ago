@@ -58,6 +58,19 @@ chan, timeout) for go-routines that you don't want to snapshot (not
 part of your simulation/model), such as GUI-related go-routines that
 are handling button clicks or trying to rendering output.
 
+## LICENSE
+
+Eclipse Public License
+
+## Building
+
+    lein cljsbuild once
+
+This was inobvious to me until Aaron Miller pointed it out to me,
+to help during development...
+
+    lein cljsbuild auto
+
 ## Underneath The Hood
 
 This section might be interesting only to those folks who
@@ -97,14 +110,6 @@ mutable skip-list implementation), again for easy snapshot'ability.
 One issue with ago's approach is that it may be brittle, where changes
 to clojurescript core.async's SSA transformations or
 Channel/Buffer/Handler protocols might break ago.
-
-## Building
-
-    lein cljsbuild auto ago
-
-## LICENSE
-
-Eclipse Public License
 
 ## TODO
 
