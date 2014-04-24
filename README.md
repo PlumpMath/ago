@@ -64,11 +64,12 @@ This section might be interesting only to those folks who
 delve into how core.async works or who want to understand
 ago's limitations.
 
-ClojureScript provides hooks in its macros that convert go blocks to
-SSA form, and the ago library utilizes those hooks to interpose its
-own take/put/aalt callbacks so that ago has access to the state
-machine arrays of each "go-routine".  With those hooks the ago library
-can then register the state machine arrays into the world-handle.
+ClojureScript provides hooks in its core.async macros that transform
+go blocks to SSA form, and the ago library utilizes those hooks to
+interpose its own take/put/alts callbacks so that ago has access to
+the state machine arrays of each "go-routine".  With those hooks the
+ago library can then register the state machine arrays into the
+world-handle.
 
 A world-handle is a just an immutable/persistent associative map atom.
 
@@ -93,6 +94,25 @@ The ago library also has its own persistent/immutable
 re-implementation of the timer queue (instead of core.async's default
 mutable skip-list implementation), again for easy snapshot'ability.
 
+One issue with ago's approach is that it may be brittle, where changes
+to clojurescript core.async's SSA transformations or
+Channel/Buffer/Handler protocols might break ago.
+
 ## Building
 
     lein cljsbuild auto ago
+
+## LICENSE
+
+Eclipse Public License
+
+## TODO
+
+* Need to learn how to publishing libraries in clojure.
+* Need tests.
+* Need docs.
+* Need examples.
+* Need to learn cljx.
+* Run this in nodejs/v8?
+* Figure out how to use this in clojure.
+* Figure out how to serialize/deserialize a snapshot.

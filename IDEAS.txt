@@ -1,3 +1,6 @@
+[steve: this file has a bunch of early notes while trying to figure
+out clojure, clojurescript, and core.async.]
+
 goroutines have state,
   which might reference...
     chan's,
