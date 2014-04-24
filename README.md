@@ -29,7 +29,11 @@ can have "TiVo for your simulated model".
 ## How To Use
 
 The "ago" library provides API's which wrap around the main API's of
-core.async.  The ago library API's follow a naming/parameter
+core.async.  These ago API functions should be used instead of the
+regular clojurescript core.async API functions if you want
+snapshot/rewindability.
+
+The ago library API's follow a naming/parameter
 convention of having an "a" prefix in their function names and also
 an extra first parameter of a "world handle".  For example...
 
@@ -48,6 +52,11 @@ And, to snapshot a world...
 And, to restore a previous snapshot...
 
 * (ago-restore world-handle snapshot)
+
+You should use regular clojurescript core.async API function (go,
+chan, timeout) for go-routines that you don't want to snapshot (not
+part of your simulation/model), such as GUI-related go-routines that
+are handling button clicks or trying to rendering output.
 
 ## Underneath The Hood
 
