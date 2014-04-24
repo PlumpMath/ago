@@ -2,27 +2,31 @@
 
 ## Motivations
 
-The "ago" library is meant to help folks using (clojurescript)
+The "ago" library is meant to help folks who are using (clojurescript)
 core.async to build discrete event simulations.
 
-For example, I was trying to use core.async to model and simulate
-clients, servers and messages in a distributed system.
+For example, I was trying to model and simulate clients, servers and
+messages in a distributed system and core.async was a perfect fit.
 
 By using clojurescript core.async, I could run my simulations in
 modern web browsers to have an easy to use GUI / visualization
 environment.
 
-But, a missing feature in core.async is that it is not clear how to
-"rewind the world" back to a previous state in a simulation so that
-one can replay events.  What I wanted was to snapshot all the inflight
-go-routines, channels, timeouts and their inherent state, and then
-later restore the simulated world to that previous snapshot.
+But, one issue was that it was not clear how to "rewind the world"
+back to a previous state in a simulation so that one can replay a
+simulation (and perhaps take alternative pathways).
+
+What I wanted was to snapshot all the inflight go-routines, channels,
+timeouts and all their inherent state ("snapshot"), and then later
+restore the simulated world to that previous snapshot ("rewind" or
+"restore").
 
 The vision is that UI frameworks like Om
 (https://github.com/swannodette/om) allow for easy rollback or undo
 and redo of app-state (yay, immutable/persistent data structures).  In
 my case, I wanted a big part of the app-state to be a bunch of
-go-routines and channels.
+go-routines and channels and to be able to undo/redo all that
+asynchronous activity.
 
 The "ago" library, which is built on top of clojurescript core.async,
 is meant to provide that snapshot and restore ability, so that one
@@ -129,12 +133,14 @@ Channel/Buffer/Handler protocols can easily break ago.
 
 ## TODO
 
-* Need to learn how to publishing libraries in clojure.
 * Need tests.
 * Learn about automated build / test passing badges.
+* Need to learn how to publishing libraries in clojure (clojars.org).
 * Need docs.
 * Need examples.
 * Need to learn cljx.
 * Run this in nodejs/v8?
 * Figure out how to use this in clojure.
 * Figure out how to serialize/deserialize a snapshot.
+  Difficult due to lots of state in captured closures.
+
