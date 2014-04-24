@@ -12,7 +12,7 @@
   :hooks [leiningen.cljsbuild]
 
   :source-paths ["src"]
-  :clojurescript? true
+
   :cljsbuild {
     :builds [{:id "ago"
               :source-paths ["src"]
