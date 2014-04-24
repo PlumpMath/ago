@@ -42,9 +42,10 @@ handle".  For example...
 * Instead of (chan) use (ago-chan world-handle)
 * Instead of (timeout delay) use (ago-timeout world-handle delay)
 
-There's an API to create a world-handle, with associated user data...
+There's an API to create a world-handle, with associated, opaque
+app-data (use app-data for whatever you want)...
 
-* (make-ago-world opaque-user-data)
+* (make-ago-world app-data) => world-handle
 
 And, to snapshot a world...
 
@@ -63,7 +64,7 @@ handling button clicks or rendering output.
 
 An ago world-handle has a distinction between logical time and
 physical clock time, where logical time can proceed at a different
-pace than physical clock time (use a :logical-speed value less than or
+pace than physical clock time (set a :logical-speed value less than or
 greater than 1.0).  This may be useful for some kinds of simulations.
 
 Of note, logical time can rollback to lower values when you restore a
@@ -95,37 +96,42 @@ the state machine arrays of each "go-routine".  With those hooks the
 ago library can then register the state machine arrays into the
 world-handle.
 
-A world-handle is a just an immutable/persistent associative map atom.
+A world-handle is a just an atom to a immutable/persistent associative
+hash-map.
 
 Also, instead of using clojurescript core.async's default buffer
 implementation (a mutable RingBuffer), the ago library instead
-requires that you use its immutable/persistent buffer implementation,
-which are also registered into the world-handle.
+requires that you use its immutable/persistent buffer implementation.
+These buffers are also all registered into the world-handle.
 
 A snapshot is then copying a world-handle and cloning any registered
 state-machine-arrays.  And, buffer snapshotting comes "for free"
 due to ago's immutable/persistent buffer re-implemenation.
 
 A restore is then swapping a previous world-handle back into place,
-and copying back any relevant state-machine-arrays.
+and copying back any relevant state-machine-array contents.
 
-Each world-handle also tracks a branching version vector, kinda like
-git/DVCS branches, so that any inflight go-routines can detect that
-"hey, I'm actually a go-routine for a branch that's no longer the
-mainline, so I should die (and get GC'ed)".
+In short, this snapshotting and rewinding all works only if you use
+immutable/persistent data structures throughout your model.
+
+Each world-handle also tracks a branching version vector, so that any
+inflight go-routines can detect that "hey, I'm actually a go-routine
+apparently spawned on a branch that's no longer the main timeline, so
+I should die (and get GC'ed)".
 
 The ago library also has its own persistent/immutable
 re-implementation of the timer queue (instead of core.async's default
 mutable skip-list implementation), again for easy snapshot'ability.
 
 One issue with ago's approach is that it may be brittle, where changes
-to clojurescript core.async's SSA transformations or
-Channel/Buffer/Handler protocols might break ago.
+to clojurescript core.async's SSA implementation or
+Channel/Buffer/Handler protocols can easily break ago.
 
 ## TODO
 
 * Need to learn how to publishing libraries in clojure.
 * Need tests.
+* Learn about automated build / test passing badges.
 * Need docs.
 * Need examples.
 * Need to learn cljx.
