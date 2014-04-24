@@ -1,4 +1,4 @@
-# ago - snapshots for clojurescript core.async
+# ago - time travel for clojurescript core.async
 
 ## Motivations
 
@@ -14,24 +14,26 @@ environment.
 
 But, a missing feature in core.async is that it is not clear how to
 "rewind the world" back to a previous state in a simulation so that
-one can replay events.  That is, I wanted to snapshot all the inflight
-go-routines and channels and their inherent state, and then later
-restore the simulated world to that previous snapshot.
+one can replay events.  What I wanted was to snapshot all the inflight
+go-routines, channels, timeouts and their inherent state, and then
+later restore the simulated world to that previous snapshot.
 
-The vision is that UI frameworks like Om allow for undo and redo
-of app-state.  In this case the app-state would be the state
-of a bunch of go-routines and channels.
+The vision is that UI frameworks like Om
+(https://github.com/swannodette/om) allow for easy rollback or undo
+and redo of app-state (yay, immutable/persistent data structures).  In
+my case, I wanted a big part of the app-state to be a bunch of
+go-routines and channels.
 
 The "ago" library, which is built on top of clojurescript core.async,
 is meant to provide that snapshot and restore ability, so that one
-can have "TiVo for your simulated model".
+can have "TiVo for your simulation".
 
 ## How To Use
 
 The "ago" library provides API's which wrap around the main API's of
 core.async.  These ago API functions should be used instead of the
-regular clojurescript core.async API functions if you want
-snapshot/rewindability.
+regular clojurescript core.async API functions in those places in
+your simulation where you want snapshot/rewind-ability.
 
 The ago library API's follow a naming/parameter
 convention of having an "a" prefix in their function names and also
@@ -57,6 +59,16 @@ You should use regular clojurescript core.async API function (go,
 chan, timeout) for go-routines that you don't want to snapshot (not
 part of your simulation/model), such as GUI-related go-routines that
 are handling button clicks or trying to rendering output.
+
+## Time
+
+An ago world-handle has a distinction between logical time and
+physical clock time, where logical time can proceed at a different
+pace than physical clock time (use a :logical-speed value less than or
+greater than 1.0).  This may be useful for some kinds of simulations.
+
+Of note, logical time can rollback to lower values when you restore a
+previous snapshot.
 
 ## LICENSE
 

@@ -34,7 +34,7 @@
 
 (defn make-ago-world [app-data]
   (let [last-id (atom 0)]
-    (atom {:app-data app-data ; For application-specific needs.
+    (atom {:app-data app-data ; Opaque, for application-specific needs.
            :gen-id #(swap! last-id inc) ; Unique even across snapshots.
            :seqv [0]          ; An seqv vector is grown during a restore.
            :bufs {}           ; Keyed by buf-id, value is FifoBuffer.
@@ -47,7 +47,7 @@
            })))
 
 (defn seqv+ [ago-world-now]
-  (if (zero? (:logical-speed ago-world-now)) ; Zero check avoids seqv inc.
+  (if (zero? (:logical-speed ago-world-now)) ; No seqv inc when at zero speed.
     ago-world-now
     (let [t (now)]
       (-> ago-world-now
