@@ -37,23 +37,24 @@ can have "TiVo for your simulation".
 ## How To Use
 
 The "ago" library provides API's which wrap around the main API's of
-core.async.  These ago wrapper functions should only be used in those
-places in where you want snapshot/rewind-ability, as they have
-additional overhead (from using immutable/persistent data structures).
+core.async.  These ago wrapper functions should only be used where you
+want snapshot/rewind-ability, as they have additional overhead (from
+using immutable/persistent data structures).
 
 The ago library API's usually have a first parameter of a
 "world-handle".  For example...
 
-* Instead of (go ...) use (ago world-handle ...)
-* Instead of (chan) use (ago-chan world-handle)
-* Instead of (timeout delay) use (ago-timeout world-handle delay)
+* Instead of (go ...) it's (ago world-handle ...)
+* Instead of (chan) it's (ago-chan world-handle)
+* Instead of (timeout delay) it's (ago-timeout world-handle delay)
 
 There's an API to create a world-handle, where you can provide an
 associated, opaque app-data (use app-data for whatever you want)...
 
 * (make-ago-world app-data) => world-handle
 
-Then you can create "ago channels" and "ago routines" in that world...
+Then you can create "ago channels" and "ago routines" with that
+world-handle...
 
     (let [ch1 (ago-chan world-handle)]
       (ago world-handle
@@ -61,13 +62,15 @@ Then you can create "ago channels" and "ago routines" in that world...
       (ago world-handle
         ["I received" (<! ch1)]))
 
-And, to snapshot a world...
+And, to snapshot a world, using ago-snapshot...
 
-* (ago-snapshot world-handle) => snapshot
+    (let [snapshot (ago-snapshot world-handle)]
+      ...
+      )
 
 And, to restore a previous snapshot...
 
-* (ago-restore world-handle snapshot)
+    (ago-restore world-handle snapshot)
 
 Because the ago routines and ago channels have additional overhead,
 you should use regular clojurescript core.async API functions (go,
@@ -80,13 +83,15 @@ are handling button clicks or rendering output.
 If you use the ago-timeout feature, you may want to slow down
 or speed up simulation time (or "logical time").
 
-An ago world-handle has a distinction between logical time and
-physical clock time, where logical time can proceed at a different
-pace than physical clock time (set a :logical-speed value less than or
-greater than 1.0).  This may be useful for some kinds of simulations.
+That is, there's a distinction between logical time and physical clock
+time, where logical time can proceed at a different pace than physical
+clock time.  Just set the :logical-speed value in a world-handle to
+not 1.0.  This may be useful for some kinds of simulations.
 
 Of note, logical time can rollback to lower values when you restore a
-previous snapshot.
+previous snapshot, which can have interesting, unintended rendering
+effects if you're just doing simple delta "functional reactive" style
+visualizations.
 
 Logical time starts at 0 when you invoke (make-ago-world ...).
 
@@ -112,11 +117,11 @@ ClojureScript provides hooks in its core.async macros which transform
 go blocks to SSA form, and the ago library utilizes those hooks to
 interpose its own take/put/alts callbacks so that ago has access to
 the state machine arrays of each "go routine".  With those hooks the
-ago library can then register the state machine arrays into the
+ago library can then register those state machine arrays into its
 world-handle.
 
-A world-handle is a just an atom to a immutable/persistent associative
-hash-map.
+A world-handle is a just an atom to an immutable/persistent
+associative hash-map.
 
 Also, instead of using clojurescript core.async's default buffer
 implementation (a mutable RingBuffer), the ago library instead
@@ -142,26 +147,27 @@ apparently spawned on a branch that's no longer the main timeline, so
 I should exit (and get GC'ed)".
 
 The ago library also has its own persistent/immutable
-re-implementation of the timer queue (instead of core.async's mutable
-skip-list implementation), again for easy snapshot'ability.
+re-implementation of the timeout queue (instead of core.async's
+mutable skip-list implementation), again for easy snapshot'ability.
 
-One issue with ago's approach is that it may be brittle, where changes
-to clojurescript core.async's SSA implementation or
+Although ago was writtent to not have any changes to core.async, one
+issue with the current approach is that it may be brittle, where
+changes to clojurescript core.async's SSA implementation or
 Channel/Buffer/Handler protocols can easily break ago.
 
 ## TODO
 
-* Need to learn how to test.
+* Need to learn how to test in clojurescript.
 * Learn about automated build / test passing badges.
-* Need to learn how to publishing libraries in clojure (clojars.org).
+* Need to learn how to publish libraries in clojure (clojars.org?).
 * Need docs.
 * Need examples.
 * Need to learn cljx.
 * Run this in nodejs/v8?
 * Figure out how to use this in clojure/JVM.
 * Figure out how to serialize/deserialize a snapshot.
-  (e.g, save a simulated world to a file.)
-  This will be difficult due to lots of state captured in closures.
+  (e.g, save a snapshot to a file.)
+  This will be difficult due to lots of state stuck in closures.
   Probably have to define some onerous app limitations to allow for
   serialization/deserialization.
 
