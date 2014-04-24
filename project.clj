@@ -20,8 +20,4 @@
                 :output-to "ago.js"
                 :output-dir "out"
                 :optimizations :none
-                :source-map true}}]}
-
-  :main ^:skip-aot ago.test
-  :target-path "target/%s"
-  :profiles {:uberjar {:aot :all}})
+                :source-map true}}]})
