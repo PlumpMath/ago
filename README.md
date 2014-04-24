@@ -150,8 +150,8 @@ The ago library also has its own persistent/immutable
 re-implementation of the timeout queue (instead of core.async's
 mutable skip-list implementation), again for easy snapshot'ability.
 
-Although ago was writtent to not have any changes to core.async, one
-issue with the current approach is that it may be brittle, where
+Although ago was written to not have any changes to core.async, one
+issue with ago's current approach is that it may be brittle, where
 changes to clojurescript core.async's SSA implementation or
 Channel/Buffer/Handler protocols can easily break ago.
 
