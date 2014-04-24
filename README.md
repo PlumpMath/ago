@@ -31,17 +31,16 @@ can have "TiVo for your simulation".
 ## How To Use
 
 The "ago" library provides API's which wrap around the main API's of
-core.async.  These ago API functions should be used instead of the
-regular clojurescript core.async API functions in those places in
-your simulation where you want snapshot/rewind-ability.
+core.async.  These ago wrapper functions should only be used in those
+places in where you want snapshot/rewind-ability, as they have
+additional overhead.
 
-The ago library API's follow a naming/parameter
-convention of having an "a" prefix in their function names and also
-an extra first parameter of a "world handle".  For example...
+The ago library API's usually have a first parameter of a "world
+handle".  For example...
 
-* (go ...) becomes (ago world-handle ...)
-* (chan) becomes (achan world-handle)
-* (timeout delay) becomes (atimeout world-handle delay)
+* Instead of (go ...) use (ago world-handle ...)
+* Instead of (chan) use (ago-chan world-handle)
+* Instead of (timeout delay) use (ago-timeout world-handle delay)
 
 There's an API to create a world-handle, with associated user data...
 
@@ -55,10 +54,10 @@ And, to restore a previous snapshot...
 
 * (ago-restore world-handle snapshot)
 
-You should use regular clojurescript core.async API function (go,
-chan, timeout) for go-routines that you don't want to snapshot (not
-part of your simulation/model), such as GUI-related go-routines that
-are handling button clicks or trying to rendering output.
+You should use regular clojurescript core.async API functions (go,
+chan, timeout) for areas that you don't want to snapshot (not part of
+your simulation/model), such as GUI-related go-routines that are
+handling button clicks or rendering output.
 
 ## Time
 
