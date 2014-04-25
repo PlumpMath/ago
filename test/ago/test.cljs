@@ -1,7 +1,7 @@
 (ns ago.test
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]
                    [ago.macros :refer [ago]])
-  (:require [cljs.core.async :refer [chan close! <! !> <!! >!! alts! put! take!]]
+  (:require [cljs.core.async :refer [chan close! <! >! alts! put! take!]]
             [ago.core :refer [make-ago-world ago-chan ago-snapshot ago-restore
                               seqv+ compare-seqvs seqv-alive?]]
             [goog.dom :as gdom]
@@ -146,7 +146,7 @@
 (defn test-put-take []
   (println "test-put-take")
   (let [agw (make-ago-world nil)
-        ch0 (ago-chan agw 1)
+        ch0 (ago-chan agw)
         ch1 (ago-chan agw 1)
         echoer (ago agw
                     (loop [acc []]
