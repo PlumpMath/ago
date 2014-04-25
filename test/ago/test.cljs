@@ -14,10 +14,9 @@
     (gevents/listen el type #(put! out %))
     out))
 
-(defn hello []
-  (println "Hello, World!"))
+; ----------------------------------------------------------
 
-(hello)
+; Hooked up to buttons to allow interactive tests / demos.
 
 (defn child [agw in-ch]
   (ago agw
@@ -52,7 +51,6 @@
   (ago agw
        (loop [num-hi 0 num-bye 0]
          (println "num-hi" num-hi "num-bye" num-bye)
-         (println :agw @agw)
          (let [[x ch] (alts! [hi-ch bye-ch])]
            (cond
             (= ch hi-ch)
@@ -86,7 +84,6 @@
   (ago agw
        (loop [num-fie 0]
          (println "num-fie" num-fie)
-         (println :agw @agw)
          (>! ch2 [:fie num-fie])
          (>! ch2 [:foe num-fie])
          (let [x (<! fie-ch)]
