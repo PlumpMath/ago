@@ -23,11 +23,5 @@
                         :compiler {:output-to "ago-test.js"
                                    :output-dir "out-test"
                                    :optimizations :none
-                                   :source-map true}}
-             :ago-test-phantomjs {:source-paths ["src" "test-phantomjs"]
-                                  :compiler {:output-to "ago-test-phantomjs.js"
-                                             :output-dir "out-test-phantomjs"
-                                             :optimizations :none
-                                             :source-map true}}}
-     :test-commands {"test-phantomjs"
-                     ["phantomjs" "test-phantomjs/run.js" "test-phantomjs/run.html"]}})
+                                   :source-map true}}}
+     :test-commands {"test" ["phantomjs" "test/run.js" "index.html"]}})

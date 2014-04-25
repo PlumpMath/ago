@@ -1,5 +1,3 @@
-; This ago.test script runs in a browser.
-
 (ns ago.test
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]
                    [ago.macros :refer [ago]])
@@ -105,3 +103,16 @@
                         "x2" x2 "num-fie2" num-fie2)
                (recur (inc num-fie)))))))
   (child2 agw ch2))
+
+; ----------------------------------------------------------
+
+(def success 0)
+
+(defn test-app-data []
+  (assert (not= nil (make-ago-world nil)))
+  (assert (= (:app-data @(make-ago-world :my-app-data)) :my-app-data)))
+
+(defn ^:export run []
+  (.log js/console "ago test run started.")
+  (test-app-data)
+  success)
