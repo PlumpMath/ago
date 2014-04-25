@@ -134,14 +134,15 @@
   number, will create and use a buffer with that max-length."
   ([ago-world] (ago-chan ago-world nil))
   ([ago-world buf-or-n]
-     (let [buf-or-n (if (= buf-or-n 0)
+     (let [ch-id (str "ch-" ((:gen-id @ago-world)))
+           buf-or-n (if (= buf-or-n 0)
                       nil
                       buf-or-n)]
        (ago-chan-buf ago-world
                      (if (number? buf-or-n)
-                       (fifo-buffer ago-world (str "ch-" ((:gen-id @ago-world)))
-                                    buf-or-n)
-                       buf-or-n)))))
+                       (fifo-buffer ago-world ch-id buf-or-n)
+                       buf-or-n)
+                     ch-id))))
 
 (defn chan-seqv [ch]
   (when (instance? FifoBuffer (.-takes ch))

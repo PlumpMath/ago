@@ -147,7 +147,7 @@
   (println "test-put-take")
   (let [agw (make-ago-world nil)
         ch0 (ago-chan agw)
-        ch1 (ago-chan agw 1)
+        ch1 (ago-chan agw)
         echoer (ago agw
                     (loop [acc []]
                       (if-let [msg (<! ch0)]
