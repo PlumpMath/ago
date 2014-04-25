@@ -1,7 +1,7 @@
 (ns ago.test
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]
                    [ago.macros :refer [ago]])
-  (:require [cljs.core.async :refer [chan <! !> alts! put! take!]]
+  (:require [cljs.core.async :refer [chan close! <! !> <!! >!! alts! put! take!]]
             [ago.core :refer [make-ago-world ago-chan ago-snapshot ago-restore
                               seqv+ compare-seqvs seqv-alive?]]
             [goog.dom :as gdom]
@@ -110,6 +110,7 @@
 (def success 0)
 
 (defn test-constructors []
+  (println "test-constructors")
   (assert (not= nil (make-ago-world nil)))
   (assert (= (:app-data @(make-ago-world :my-app-data)) :my-app-data))
   (assert (= (:logical-ms @(make-ago-world nil)) 0))
@@ -120,6 +121,7 @@
       (assert (= (count (:bufs @agw)) 0)))))
 
 (defn test-seqvs []
+  (println "test-seqvs")
   (let [agw (make-ago-world nil)
         sq0 (:seqv @agw)]
     (take! (ago agw 9)
@@ -128,23 +130,50 @@
              (let [sq1 (:seqv @agw)
                    agw2 (atom (seqv+ @agw))
                    sq2 (:seqv @agw2)]
-               (assert (= 0 (compare-seqvs sq0 sq0)))
-               (assert (= 0 (compare-seqvs sq1 sq1)))
-               (assert (= 1 (compare-seqvs sq1 sq0)))
-               (assert (= -1 (compare-seqvs sq0 sq1)))
-               (assert (= 0 (compare-seqvs sq2 sq2)))
-               (assert (= 1 (compare-seqvs sq2 sq0)))
-               (assert (= 1 (compare-seqvs sq2 sq1)))
-               (assert (= -1 (compare-seqvs sq0 sq2)))
-               (assert (= -1 (compare-seqvs sq1 sq2)))
+               (assert (= (compare-seqvs sq0 sq0) 0))
+               (assert (= (compare-seqvs sq1 sq1) 0))
+               (assert (> (compare-seqvs sq1 sq0) 0))
+               (assert (< (compare-seqvs sq0 sq1) 0))
+               (assert (= (compare-seqvs sq2 sq2) 0))
+               (assert (> (compare-seqvs sq2 sq0) 0))
+               (assert (> (compare-seqvs sq2 sq1) 0))
+               (assert (< (compare-seqvs sq0 sq2) 0))
+               (assert (< (compare-seqvs sq1 sq2) 0))
                (assert (seqv-alive? agw2 sq0))
                (assert (seqv-alive? agw2 sq1))
                (assert (seqv-alive? agw2 sq2))
                (assert (not (seqv-alive? agw sq2)))
-               (assert (not (seqv-alive? agw nil))))))))
+               (assert (seqv-alive? agw nil))
+               (assert (seqv-alive? agw2 nil)))))))
+
+(defn test-put-take []
+  (println "test-put-take")
+  (let [agw (make-ago-world nil)
+        ch0 (ago-chan agw 1)
+        ch1 (ago-chan agw 1)
+        echoer (ago agw
+                    (loop [acc []]
+                      (if-let [msg (<! ch0)]
+                        (do (>! ch1 {:msg msg})
+                            (recur (conj acc msg)))
+                        (do (close! ch1)
+                            acc))))
+        sender (ago agw
+                    (>! ch0 :hi)
+                    (>! ch0 :world)
+                    (close! ch0)
+                    :sender-done)]
+    (go (println "ch1 got x" (<! ch1))
+        (println "ch1 got x" (<! ch1))
+        (println "ch1 got x" (<! ch1))
+        (println "echoer got x" (<! echoer))
+        (println "echoer got x" (<! echoer))
+        (println "sender got x" (<! sender))
+        (println "sender got x" (<! sender)))))
 
 (defn ^:export run []
-  (.log js/console "ago test run started.")
+  (println "ago test run started.")
   (test-constructors)
   (test-seqvs)
+  (test-put-take)
   success)
