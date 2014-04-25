@@ -1,7 +1,8 @@
 (ns ago.test
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]
                    [ago.macros :refer [ago]])
-  (:require [cljs.core.async :refer [chan close! <! >! alts! put! take!]]
+  (:require [cljs.core.async.impl.dispatch]
+            [cljs.core.async :refer [chan close! <! >! alts! put! take!]]
             [ago.core :refer [make-ago-world ago-chan ago-snapshot ago-restore
                               seqv+ compare-seqvs seqv-alive?]]
             [goog.dom :as gdom]
@@ -159,18 +160,26 @@
                     (>! ch0 :hi)
                     (>! ch0 :world)
                     (close! ch0)
-                    :sender-done)]
-    (go (println "ch1 got x" (<! ch1))
-        (println "ch1 got x" (<! ch1))
-        (println "ch1 got x" (<! ch1))
-        (println "echoer got x" (<! echoer))
-        (println "echoer got x" (<! echoer))
-        (println "sender got x" (<! sender))
-        (println "sender got x" (<! sender)))))
+                    :sender-done)
+        all-done (atom false)]
+    (go (assert (= {:msg :hi} (<! ch1)))
+        (assert (= {:msg :world} (<! ch1)))
+        (assert (= nil (<! ch1)))
+        (assert (= [:hi :world] (<! echoer)))
+        (assert (= nil (<! echoer)))
+        (assert (= :sender-done (<! sender)))
+        (assert (= nil (<! sender)))
+        (reset! all-done true))
+    (loop []
+      (when (not @all-done)
+        (cljs.core.async.impl.dispatch/process-messages)
+        (recur)))
+    @all-done))
 
 (defn ^:export run []
   (println "ago test run started.")
   (test-constructors)
   (test-seqvs)
   (test-put-take)
+  (println "ago test run PASS.")
   success)
