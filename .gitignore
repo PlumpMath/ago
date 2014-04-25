@@ -5,6 +5,7 @@
 pom.xml
 pom.xml.asc
 ago.js
+*-test*
 *.jar
 *.class
 /.lein-*

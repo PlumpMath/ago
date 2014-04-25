@@ -14,10 +14,13 @@
   :source-paths ["src"]
 
   :cljsbuild {
-    :builds [{:id "ago"
-              :source-paths ["src"]
-              :compiler {
-                :output-to "ago.js"
-                :output-dir "out"
-                :optimizations :none
-                :source-map true}}]})
+    :builds {:ago {:source-paths ["src"]
+                   :compiler {:output-to "ago.js"
+                              :output-dir "out"
+                              :optimizations :none
+                              :source-map true}}
+             :ago-test {:source-paths ["src" "test"]
+                        :compiler {:output-to "ago-test.js"
+                                   :output-dir "out-test"
+                                   :optimizations :none
+                                   :source-map true}}}})
