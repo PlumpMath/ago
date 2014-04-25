@@ -1,8 +1,9 @@
 (ns ago.test
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]
                    [ago.macros :refer [ago]])
-  (:require [cljs.core.async :refer [chan <! !> alts! put!]]
-            [ago.core :refer [make-ago-world ago-chan ago-snapshot ago-restore]]
+  (:require [cljs.core.async :refer [chan <! !> alts! put! take!]]
+            [ago.core :refer [make-ago-world ago-chan ago-snapshot ago-restore
+                              seqv+ compare-seqvs seqv-alive?]]
             [goog.dom :as gdom]
             [goog.events :as gevents]))
 
@@ -108,11 +109,42 @@
 
 (def success 0)
 
-(defn test-app-data []
+(defn test-constructors []
   (assert (not= nil (make-ago-world nil)))
-  (assert (= (:app-data @(make-ago-world :my-app-data)) :my-app-data)))
+  (assert (= (:app-data @(make-ago-world :my-app-data)) :my-app-data))
+  (assert (= (:logical-ms @(make-ago-world nil)) 0))
+  (let [agw (make-ago-world nil)]
+    (assert (= (count (:bufs @agw)) 0))
+    (let [ch1 (ago-chan agw)]
+      (assert (not= nil ch1))
+      (assert (= (count (:bufs @agw)) 0)))))
+
+(defn test-seqvs []
+  (let [agw (make-ago-world nil)
+        sq0 (:seqv @agw)]
+    (take! (ago agw 9)
+           (fn [should-be-9]
+             (assert (= 9 should-be-9))
+             (let [sq1 (:seqv @agw)
+                   agw2 (atom (seqv+ @agw))
+                   sq2 (:seqv @agw2)]
+               (assert (= 0 (compare-seqvs sq0 sq0)))
+               (assert (= 0 (compare-seqvs sq1 sq1)))
+               (assert (= 1 (compare-seqvs sq1 sq0)))
+               (assert (= -1 (compare-seqvs sq0 sq1)))
+               (assert (= 0 (compare-seqvs sq2 sq2)))
+               (assert (= 1 (compare-seqvs sq2 sq0)))
+               (assert (= 1 (compare-seqvs sq2 sq1)))
+               (assert (= -1 (compare-seqvs sq0 sq2)))
+               (assert (= -1 (compare-seqvs sq1 sq2)))
+               (assert (seqv-alive? agw2 sq0))
+               (assert (seqv-alive? agw2 sq1))
+               (assert (seqv-alive? agw2 sq2))
+               (assert (not (seqv-alive? agw sq2)))
+               (assert (not (seqv-alive? agw nil))))))))
 
 (defn ^:export run []
   (.log js/console "ago test run started.")
-  (test-app-data)
+  (test-constructors)
+  (test-seqvs)
   success)
