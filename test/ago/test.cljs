@@ -176,10 +176,54 @@
         (recur)))
     @all-done))
 
+(defn test-alts []
+  (println "test-alts")
+  (let [agw (make-ago-world nil)
+        chx (ago-chan agw)
+        chy (ago-chan agw)
+        chz (ago-chan agw)
+        collector (ago agw
+                       (loop [chs #{chx chy chz}
+                              acc #{}]
+                         (if (seq chs)
+                           (let [[v ch] (alts! (vec chs))]
+                             (if v
+                               (recur chs (conj acc v))
+                               (recur (disj chs ch) acc)))
+                           acc)))
+        sender0 (ago agw
+                     (>! chx :hi)
+                     (>! chx :world)
+                     (close! chx)
+                     :sender0-done)
+        sender1 (ago agw
+                     (loop [msgs {chy :fee chz :fie}]
+                       (when (seq msgs)
+                         (let [[v ch] (alts! (vec msgs))]
+                           (recur (dissoc msgs ch)))))
+                     (close! chy)
+                     (close! chz)
+                     :sender1-done)
+        all-done (atom false)]
+    (go (let [msgs (<! collector)]
+          (assert (= msgs #{:hi :world :fee :fie}))
+          (assert (= (<! collector) nil))
+          (assert (= (<! sender0) :sender0-done))
+          (assert (= (<! sender0) nil))
+          (assert (= (<! sender1) :sender1-done))
+          (assert (= (<! sender1) nil))
+          (reset! all-done true)))
+    (loop []
+      (when (not @all-done)
+        (cljs.core.async.impl.dispatch/process-messages)
+        (recur)))
+    @all-done))
+
 (defn ^:export run []
   (println "ago test run started.")
   (test-constructors)
   (test-seqvs)
   (test-put-take)
+  (test-alts)
   (println "ago test run PASS.")
   success)
