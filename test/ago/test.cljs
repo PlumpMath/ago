@@ -144,11 +144,11 @@
                (assert (seqv-alive? agw nil))
                (assert (seqv-alive? agw2 nil)))))))
 
-(defn test-put-take []
-  (println "test-put-take")
+(defn test-put-take [chan-size]
+  (println "test-put-take" chan-size)
   (let [agw (make-ago-world nil)
-        ch0 (ago-chan agw)
-        ch1 (ago-chan agw)
+        ch0 (ago-chan agw chan-size)
+        ch1 (ago-chan agw chan-size)
         echoer (ago agw
                     (loop [acc []]
                       (if-let [msg (<! ch0)]
@@ -176,12 +176,12 @@
         (recur)))
     @all-done))
 
-(defn test-alts []
-  (println "test-alts")
+(defn test-alts [chan-size]
+  (println "test-alts" chan-size)
   (let [agw (make-ago-world nil)
-        chx (ago-chan agw)
-        chy (ago-chan agw)
-        chz (ago-chan agw)
+        chx (ago-chan agw chan-size)
+        chy (ago-chan agw chan-size)
+        chz (ago-chan agw chan-size)
         collector (ago agw
                        (loop [chs #{chx chy chz}
                               acc #{}]
@@ -223,7 +223,11 @@
   (println "ago test run started.")
   (test-constructors)
   (test-seqvs)
-  (test-put-take)
-  (test-alts)
+  (test-put-take 0)
+  (test-put-take 1)
+  (test-put-take 10)
+  (test-alts 0)
+  (test-alts 1)
+  (test-alts 10)
   (println "ago test run PASS.")
   success)
