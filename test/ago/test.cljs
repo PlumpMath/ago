@@ -1,3 +1,5 @@
+; This ago.test script runs in a browser.
+
 (ns ago.test
   (:require-macros [cljs.core.async.macros :refer [go go-loop]]
                    [ago.macros :refer [ago]])
@@ -103,4 +105,3 @@
                         "x2" x2 "num-fie2" num-fie2)
                (recur (inc num-fie)))))))
   (child2 agw ch2))
-
