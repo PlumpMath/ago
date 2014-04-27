@@ -120,7 +120,7 @@
 
 ; --------------------------------------------------------
 
-(deftype WrapManyToManyChannel [ago-world seqv takes puts buf-id m2m-ch]
+(deftype WrapManyToManyChannel [ago-world seqv buf-id m2m-ch]
   protocols/WritePort
   (put! [this val ^not-native handler]
     (protocols/put! m2m-ch val handler))
@@ -142,11 +142,11 @@
                  (.-buf-id buf)
                  (or (first default-buf-id) "unknown"))
         seqv (:seqv @ago-world)]
-    (let [takes (fifo-buffer ago-world seqv (str buf-id "-takes") -1)
-          puts (fifo-buffer ago-world seqv (str buf-id "-puts") -1)]
-      (WrapManyToManyChannel. ago-world seqv takes puts buf-id
-                              (channels/ManyToManyChannel. takes 0 puts 0
-                                                           buf false)))))
+    (WrapManyToManyChannel. ago-world seqv buf-id
+                            (channels/ManyToManyChannel.
+                             (fifo-buffer ago-world seqv (str buf-id "-takes") -1) 0
+                             (fifo-buffer ago-world seqv (str buf-id "-puts") -1) 0
+                             buf false))))
 
 (defn ago-chan
   "Creates a channel with an optional buffer. If buf-or-n is a
