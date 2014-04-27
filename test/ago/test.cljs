@@ -282,5 +282,6 @@
   (test-alts 10)
   (test-snapshot-restore 0)
   (test-snapshot-restore 1)
+  (test-snapshot-restore 10)
   (println "ago test run PASS.")
   success)
