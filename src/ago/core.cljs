@@ -12,7 +12,7 @@
             [cljs.core.async.impl.protocols :as protocols]))
 
 (defn acopy [asrc adst & start-idx]
-  (loop [idx (or start-idx 0)]
+  (loop [idx (or (first start-idx) 0)]
     (when (< idx (alength asrc))
       (aset adst idx (aget asrc idx))
       (recur (inc idx))))
@@ -40,6 +40,7 @@
            :bufs {}           ; Keyed by buf-id, value is FifoBuffer.
            :smas {}           ; Keyed by buf-id, value is state-machine array.
            :smas-new {}       ; Like :smas, but for new, not yet run goroutines.
+           :closed {}         ; Keyed by buf-id, value is bool on chan closure.
            :logical-speed 1.0 ; Logical-speed * physical-delta = logical-delta.
            :logical-ms 0      ; Logical time/msecs, which is always updated
            :physical-ms (now) ; at the same time as physical-ms time snapshot.
@@ -123,16 +124,19 @@
 (deftype WrapManyToManyChannel [ago-world seqv buf-id m2m-ch]
   protocols/WritePort
   (put! [this val ^not-native handler]
+    (set! (.-closed m2m-ch) (protocols/closed? this))
     (protocols/put! m2m-ch val handler))
 
   protocols/ReadPort
   (take! [this ^not-native handler]
+    (set! (.-closed m2m-ch) (protocols/closed? this))
     (protocols/take! m2m-ch handler))
 
   protocols/Channel
   (closed? [_]
-    (protocols/closed? m2m-ch))
+    (get-in @ago-world [:closed buf-id] false))
   (close! [this]
+    (swap! ago-world #(assoc-in % [:closed buf-id] true))
     (protocols/close! m2m-ch)))
 
 ; --------------------------------------------------------
@@ -163,18 +167,25 @@
                        buf-or-n)
                      ch-id))))
 
-(defn chan-seqv [ch]
-  (when (instance? WrapManyToManyChannel ch)
-    (.-seqv ch)))
-
 (defn chan-ago-world [ch]
   (when (instance? WrapManyToManyChannel ch)
     (.-ago-world ch)))
 
+(defn chan-seqv [ch]
+  (when (instance? WrapManyToManyChannel ch)
+    (.-seqv ch)))
+
+(defn chan-buf-id [ch]
+  (when (instance? WrapManyToManyChannel ch)
+    (.-buf-id ch)))
+
 ; --------------------------------------------------------
 
 (defn ago-reg-state-machine [ago-world state-machine-arr buf-id]
-  (swap! ago-world #(seqv+ (assoc-in % [:smas-new buf-id] state-machine-arr))))
+  (swap! ago-world #(-> %
+                        (assoc-in [:smas-new buf-id] state-machine-arr)
+                        (dissoc-in [:smas buf-id])
+                        (seqv+))))
 
 (defn ago-run-state-machine [ago-world state-machine-arr buf-id]
   (swap! ago-world #(-> %
@@ -192,13 +203,9 @@
   (let [buf (fifo-buffer ago-world (:seqv @ago-world) buf-id 1)
         ch (ago-chan-buf ago-world buf)
         new-sma (acopy old-sma ((aget old-sma ioc-helpers/FN-IDX))
-                       ioc-helpers/STATE-IDX) ; We depend on *-IDX ordering.
-        new-sma2 (ioc-macros/aset-all! new-sma ioc-helpers/USER-START-IDX ch)]
-    (ago-reg-state-machine ago-world new-sma2 buf-id)
-    (dispatch/run
-     (fn []
-       (ago-run-state-machine ago-world new-sma2 buf-id)
-       (ioc-helpers/run-state-machine-wrapped new-sma2)))
+                       ioc-helpers/STATE-IDX)] ; We depend on *-IDX ordering.
+    (ioc-macros/aset-all! new-sma ioc-helpers/USER-START-IDX ch)
+    (ago-run-state-machine ago-world new-sma buf-id)
     ch))
 
 (defn ago-judge-state-machines [bufs-ss smas-ss smas-cur]
@@ -248,30 +255,41 @@
     (commit [_] (when (active-cb) f))))
 
 (defn ssa-take [state blk ^not-native c]
-  (let [active? #(seqv-alive? (chan-ago-world c) (chan-seqv c))]
+  (let [ago-world (chan-ago-world c)
+        active? #(seqv-alive? ago-world (chan-seqv c))]
     (if-let [cb (protocols/take!
                  c (fn-handler
                     active?
                     (fn [x]
                       (when (active?)
-                        (ioc-macros/aset-all! state ioc-helpers/VALUE-IDX
-                                              x ioc-helpers/STATE-IDX blk)
-                        (ioc-helpers/run-state-machine-wrapped state)))))]
+                        (let [buf-id (chan-buf-id c)
+                              s (if ago-world
+                                  (get-in @ago-world [:smas buf-id] state)
+                                  state)]
+                          (ioc-macros/aset-all! s ioc-helpers/VALUE-IDX
+                                                x ioc-helpers/STATE-IDX blk)
+                          (ioc-helpers/run-state-machine-wrapped s))))))]
       (do (ioc-macros/aset-all! state ioc-helpers/VALUE-IDX
                                 @cb ioc-helpers/STATE-IDX blk)
           :recur)
       nil)))
 
 (defn ssa-put [state blk ^not-native c val]
-  (let [active? #(seqv-alive? (chan-ago-world c) (chan-seqv c))]
+  (let [ago-world (chan-ago-world c)
+        active? #(seqv-alive? ago-world (chan-seqv c))]
     (if-let [cb (protocols/put!
-                 c val (fn-handler
-                        active?
-                        (fn [ret-val]
-                          (when (active?)
-                            (ioc-macros/aset-all! state ioc-helpers/VALUE-IDX
-                                                  ret-val ioc-helpers/STATE-IDX blk)
-                            (ioc-helpers/run-state-machine-wrapped state)))))]
+                 c val
+                 (fn-handler
+                  active?
+                  (fn [ret-val]
+                    (when (active?)
+                      (let [buf-id (chan-buf-id c)
+                            s (if ago-world
+                                  (get-in @ago-world [:smas buf-id] state)
+                                  state)]
+                        (ioc-macros/aset-all! s ioc-helpers/VALUE-IDX
+                                              ret-val ioc-helpers/STATE-IDX blk)
+                        (ioc-helpers/run-state-machine-wrapped s))))))]
       (do (ioc-macros/aset-all! state ioc-helpers/VALUE-IDX
                                 @cb ioc-helpers/STATE-IDX blk)
           :recur)
@@ -298,7 +316,7 @@
       (when-not (nil? value)
         (protocols/put! c value (fn-handler active? (fn [] nil))))
       (protocols/close! c))
-    (ago-dereg-state-machine ago-world (.-buf-id c))
+    (ago-dereg-state-machine ago-world (chan-buf-id c))
     c))
 
 ; --------------------------------------------------------
@@ -328,6 +346,7 @@
                   (assoc :bufs (:bufs ss))
                   (assoc :smas recycled-smas)
                   (assoc :smas-new recycled-smasN)
+                  (assoc :closed (:closed ss))
                   (assoc :logical-ms (:logical-ms ss))
                   (assoc :physical-ms (now))))
       (doseq [[sma-old ss-buf-id] reborn-smas]
