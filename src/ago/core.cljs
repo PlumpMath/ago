@@ -279,7 +279,7 @@
       (when-not (nil? value)
         (protocols/put! c value (fn-handler active? (fn [] nil))))
       (protocols/close! c))
-    (ago-dereg-state-machine ago-world (.-buf-id (.-takes c)))
+    (ago-dereg-state-machine ago-world (.-buf-id (.-buf c)))
     c))
 
 ; --------------------------------------------------------
