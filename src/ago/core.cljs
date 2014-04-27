@@ -120,14 +120,33 @@
 
 ; --------------------------------------------------------
 
+(deftype WrapManyToManyChannel [ago-world seqv takes puts buf-id m2m-ch]
+  protocols/WritePort
+  (put! [this val ^not-native handler]
+    (protocols/put! m2m-ch val handler))
+
+  protocols/ReadPort
+  (take! [this ^not-native handler]
+    (protocols/take! m2m-ch handler))
+
+  protocols/Channel
+  (closed? [_]
+    (protocols/closed? m2m-ch))
+  (close! [this]
+    (protocols/close! m2m-ch)))
+
+; --------------------------------------------------------
+
 (defn ago-chan-buf [ago-world buf & default-buf-id]
   (let [buf-id (if buf
                  (.-buf-id buf)
-                 (or (first default-buf-id) "unknown"))]
-    (channels/ManyToManyChannel.
-     (fifo-buffer ago-world (:seqv @ago-world) (str buf-id "-takes") -1) 0
-     (fifo-buffer ago-world (:seqv @ago-world) (str buf-id "-puts") -1) 0
-     buf false)))
+                 (or (first default-buf-id) "unknown"))
+        seqv (:seqv @ago-world)]
+    (let [takes (fifo-buffer ago-world seqv (str buf-id "-takes") -1)
+          puts (fifo-buffer ago-world seqv (str buf-id "-puts") -1)]
+      (WrapManyToManyChannel. ago-world seqv takes puts buf-id
+                              (channels/ManyToManyChannel. takes 0 puts 0
+                                                           buf false)))))
 
 (defn ago-chan
   "Creates a channel with an optional buffer. If buf-or-n is a
@@ -145,12 +164,12 @@
                      ch-id))))
 
 (defn chan-seqv [ch]
-  (when (instance? FifoBuffer (.-takes ch))
-    (.-seqv (.-takes ch))))
+  (when (instance? WrapManyToManyChannel ch)
+    (.-seqv ch)))
 
 (defn chan-ago-world [ch]
-  (when (instance? FifoBuffer (.-takes ch))
-    (.-ago-world (.-takes ch))))
+  (when (instance? WrapManyToManyChannel ch)
+    (.-ago-world ch)))
 
 ; --------------------------------------------------------
 
@@ -279,7 +298,7 @@
       (when-not (nil? value)
         (protocols/put! c value (fn-handler active? (fn [] nil))))
       (protocols/close! c))
-    (ago-dereg-state-machine ago-world (.-buf-id (.-buf c)))
+    (ago-dereg-state-machine ago-world (.-buf-id c))
     c))
 
 ; --------------------------------------------------------
