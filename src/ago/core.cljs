@@ -115,8 +115,8 @@
   (-count [this]
     (count (get-in @ago-world [:bufs buf-id]))))
 
-(defn fifo-buffer [ago-world buf-id max-length]
-  (FifoBuffer. ago-world (:seqv @ago-world) buf-id -123 max-length))
+(defn fifo-buffer [ago-world segv buf-id max-length]
+  (FifoBuffer. ago-world segv buf-id -123 max-length))
 
 ; --------------------------------------------------------
 
@@ -125,8 +125,8 @@
                  (.-buf-id buf)
                  (or (first default-buf-id) "unknown"))]
     (channels/ManyToManyChannel.
-     (fifo-buffer ago-world (str buf-id "-takes") -1) 0
-     (fifo-buffer ago-world (str buf-id "-puts") -1) 0
+     (fifo-buffer ago-world (:seqv @ago-world) (str buf-id "-takes") -1) 0
+     (fifo-buffer ago-world (:seqv @ago-world) (str buf-id "-puts") -1) 0
      buf false)))
 
 (defn ago-chan
@@ -140,7 +140,7 @@
                       buf-or-n)]
        (ago-chan-buf ago-world
                      (if (number? buf-or-n)
-                       (fifo-buffer ago-world ch-id buf-or-n)
+                       (fifo-buffer ago-world (:seqv @ago-world) ch-id buf-or-n)
                        buf-or-n)
                      ch-id))))
 
@@ -154,30 +154,31 @@
 
 ; --------------------------------------------------------
 
-(defn ago-reg-state-machine [ago-world state-machine-arr buf]
-  (swap! ago-world #(seqv+ (assoc-in % [:smas-new (.-buf-id buf)] state-machine-arr))))
+(defn ago-reg-state-machine [ago-world state-machine-arr buf-id]
+  (swap! ago-world #(seqv+ (assoc-in % [:smas-new buf-id] state-machine-arr))))
 
-(defn ago-run-state-machine [ago-world state-machine-arr buf]
+(defn ago-run-state-machine [ago-world state-machine-arr buf-id]
   (swap! ago-world #(-> %
-                        (dissoc-in [:smas-new (.-buf-id buf)])
-                        (assoc-in [:smas (.-buf-id buf)] state-machine-arr)
+                        (dissoc-in [:smas-new buf-id])
+                        (assoc-in [:smas buf-id] state-machine-arr)
                         (seqv+))))
 
-(defn ago-dereg-state-machine [ago-world buf]
+(defn ago-dereg-state-machine [ago-world buf-id]
   (swap! ago-world #(-> %
-                        (dissoc-in [:smas-new (.-buf-id buf)])
-                        (dissoc-in [:smas (.-buf-id buf)])
+                        (dissoc-in [:smas-new buf-id])
+                        (dissoc-in [:smas buf-id])
                         (seqv+))))
 
-(defn ago-revive-state-machine [ago-world old-sma buf]
-  (let [ch (ago-chan-buf ago-world buf)
+(defn ago-revive-state-machine [ago-world old-sma buf-id]
+  (let [buf (fifo-buffer ago-world (:seqv @ago-world) buf-id 1)
+        ch (ago-chan-buf ago-world buf)
         new-sma (acopy old-sma ((aget old-sma ioc-helpers/FN-IDX))
                        ioc-helpers/STATE-IDX) ; We depend on *-IDX ordering.
         new-sma2 (ioc-macros/aset-all! new-sma ioc-helpers/USER-START-IDX ch)]
-    (ago-reg-state-machine ago-world new-sma2 buf)
+    (ago-reg-state-machine ago-world new-sma2 buf-id)
     (dispatch/run
      (fn []
-       (ago-run-state-machine ago-world new-sma2 buf)
+       (ago-run-state-machine ago-world new-sma2 buf-id)
        (ioc-helpers/run-state-machine-wrapped new-sma2)))
     ch))
 
@@ -197,10 +198,9 @@
                 (< ss-buf-id cur-buf-id)))
        (recur (rest ss-buf-ids) cur-buf-ids
               acc-recycled-smas
-              (let [ss-buf (get bufs-ss ss-buf-id)
-                    sma-old (get smas-ss ss-buf-id)]
-                ; Later, can invoke (ago-revive-state-machine agw sma-old ss-buf).
-                (conj acc-reborn-smas [sma-old ss-buf])))
+              (let [sma-old (get smas-ss ss-buf-id)]
+                ; Later, can invoke (ago-revive-state-machine agw sma-old ss-buf-id).
+                (conj acc-reborn-smas [sma-old ss-buf-id])))
 
        (and cur-buf-id ; In cur but not in ss, so drop cur's sma.
             (or (nil? ss-buf-id)
@@ -279,7 +279,7 @@
       (when-not (nil? value)
         (protocols/put! c value (fn-handler active? (fn [] nil))))
       (protocols/close! c))
-    (ago-dereg-state-machine ago-world (.-buf c))
+    (ago-dereg-state-machine ago-world (.-buf-id (.-takes c)))
     c))
 
 ; --------------------------------------------------------
@@ -311,10 +311,10 @@
                   (assoc :smas-new recycled-smasN)
                   (assoc :logical-ms (:logical-ms ss))
                   (assoc :physical-ms (now))))
-      (doseq [[sma-old ss-buf] reborn-smas]
-        (ago-revive-state-machine ago-world sma-old ss-buf))
-      (doseq [[sma-old ss-buf] reborn-smasN]
-        (ago-revive-state-machine ago-world sma-old ss-buf))
+      (doseq [[sma-old ss-buf-id] reborn-smas]
+        (ago-revive-state-machine ago-world sma-old ss-buf-id))
+      (doseq [[sma-old ss-buf-id] reborn-smasN]
+        (ago-revive-state-machine ago-world sma-old ss-buf-id))
       ago-world))
 
 ; --------------------------------------------------------

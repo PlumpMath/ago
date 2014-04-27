@@ -219,6 +219,57 @@
         (recur)))
     @all-done))
 
+(defn test-snapshot-restore [chan-size]
+  (println "test-snapshot-restore" chan-size)
+  (let [agw (make-ago-world nil)
+        cc0 (ago-chan agw chan-size) ; A control channel.
+        cc1 (ago-chan agw chan-size) ; A control channel.
+        ch0 (ago-chan agw chan-size)
+        ch1 (ago-chan agw chan-size)
+        echoer0 (ago agw
+                     (loop [n 0]
+                       (if (<! cc0)
+                         (do (>! ch0 n)
+                             (recur (inc n)))
+                         (close! ch0))))
+        echoer1 (ago agw
+                     (loop [n 0]
+                       (if (<! cc1)
+                         (do (>! ch1 n)
+                             (recur (inc n)))
+                         (close! ch1))))
+        all-done (atom false)]
+    (go (>! cc0 true)
+        (assert (= (<! ch0) 0))
+        (>! cc0 true)
+        (assert (= (<! ch0) 1))
+        (>! cc1 true)
+        (assert (= (<! ch1) 0))
+        (let [ss (ago-snapshot agw)]
+          (>! cc0 true)
+          (assert (= (<! ch0) 2))
+          (>! cc0 true)
+          (assert (= (<! ch0) 3))
+          (>! cc0 true)
+          (assert (= (<! ch0) 4))
+          (>! cc1 true)
+          (assert (= (<! ch1) 1))
+          (ago-restore agw ss) ; Restore!
+          (>! cc0 true)
+          (assert (= (<! ch0) 2))
+          (>! cc1 true)
+          (assert (= (<! ch1) 1))
+          (close! cc0)
+          (close! cc1)
+          (assert (= (<! ch0) nil))
+          (assert (= (<! ch1) nil))
+          (reset! all-done true)))
+    (loop []
+      (when (not @all-done)
+        (cljs.core.async.impl.dispatch/process-messages)
+        (recur)))
+    @all-done))
+
 (defn ^:export run []
   (println "ago test run started.")
   (test-constructors)
@@ -229,5 +280,7 @@
   (test-alts 0)
   (test-alts 1)
   (test-alts 10)
+  (test-snapshot-restore 0)
+  (test-snapshot-restore 1)
   (println "ago test run PASS.")
   success)
