@@ -136,6 +136,7 @@
   (closed? [_]
     (get-in @ago-world [:closed buf-id] false))
   (close! [this]
+    (set! (.-closed m2m-ch) (protocols/closed? this))
     (swap! ago-world #(assoc-in % [:closed buf-id] true))
     (protocols/close! m2m-ch)))
 
@@ -257,8 +258,7 @@
 (defn ssa-take [state blk ^not-native c]
   (let [ago-ch (aget state ioc-helpers/USER-START-IDX)
         ago-world (chan-ago-world ago-ch)
-        active? #(and (seqv-alive? ago-world (chan-seqv ago-ch))
-                      (seqv-alive? ago-world (chan-seqv c)))]
+        active? #(seqv-alive? ago-world (chan-seqv ago-ch))]
     (if-let [cb (protocols/take!
                  c (fn-handler
                     active?
@@ -276,8 +276,7 @@
 (defn ssa-put [state blk ^not-native c val]
   (let [ago-ch (aget state ioc-helpers/USER-START-IDX)
         ago-world (chan-ago-world ago-ch)
-        active? #(and (seqv-alive? ago-world (chan-seqv ago-ch))
-                      (seqv-alive? ago-world (chan-seqv c)))]
+        active? #(seqv-alive? ago-world (chan-seqv ago-ch))]
     (if-let [cb (protocols/put!
                  c val
                  (fn-handler
@@ -328,7 +327,7 @@
 (defn timeout-handler [ago-world]
   (swap! ago-world seqv+) ; Updates logical-ms.
   (swap! curr-js-timeout-id (fn [x]
-                              (when x (js/cancelTimeout x))
+                              (when x (js/clearTimeout x))
                               nil))
   (let [logical-ms (:logical-ms @ago-world)
         timeouts2 (loop [timeouts (:timeouts @ago-world)]
@@ -340,9 +339,8 @@
                         timeouts)))]
     (swap! ago-world #(assoc % :timeouts timeouts2))
     (when-let [[soonest-ms chs] (first timeouts2)]
-      (let [tid (js/setTimeout (fn [] (timeout-handler ago-world))
-                               (- soonest-ms logical-ms))]
-        (reset! curr-js-timeout-id tid)))))
+      (reset! curr-js-timeout-id (js/setTimeout (fn [] (timeout-handler ago-world))
+                                                (max 0 (- soonest-ms logical-ms)))))))
 
 (defn ago-timeout [ago-world delay-ms] ; Logical milliseconds from now.
   (let [timeout-at (+ delay-ms (:logical-ms @ago-world))
