@@ -255,17 +255,16 @@
     (commit [_] (when (active-cb) f))))
 
 (defn ssa-take [state blk ^not-native c]
-  (let [ago-world (chan-ago-world c)
-        active? #(seqv-alive? ago-world (chan-seqv c))]
+  (let [ago-ch (aget state ioc-helpers/USER-START-IDX)
+        ago-world (chan-ago-world ago-ch)
+        active? #(and (seqv-alive? ago-world (chan-seqv ago-ch))
+                      (seqv-alive? ago-world (chan-seqv c)))]
     (if-let [cb (protocols/take!
                  c (fn-handler
                     active?
                     (fn [x]
                       (when (active?)
-                        (let [buf-id (chan-buf-id c)
-                              s (if ago-world
-                                  (get-in @ago-world [:smas buf-id] state)
-                                  state)]
+                        (let [s (get-in @ago-world [:smas (chan-buf-id ago-ch)] state)]
                           (ioc-macros/aset-all! s ioc-helpers/VALUE-IDX
                                                 x ioc-helpers/STATE-IDX blk)
                           (ioc-helpers/run-state-machine-wrapped s))))))]
@@ -275,18 +274,17 @@
       nil)))
 
 (defn ssa-put [state blk ^not-native c val]
-  (let [ago-world (chan-ago-world c)
-        active? #(seqv-alive? ago-world (chan-seqv c))]
+  (let [ago-ch (aget state ioc-helpers/USER-START-IDX)
+        ago-world (chan-ago-world ago-ch)
+        active? #(and (seqv-alive? ago-world (chan-seqv ago-ch))
+                      (seqv-alive? ago-world (chan-seqv c)))]
     (if-let [cb (protocols/put!
                  c val
                  (fn-handler
                   active?
                   (fn [ret-val]
                     (when (active?)
-                      (let [buf-id (chan-buf-id c)
-                            s (if ago-world
-                                  (get-in @ago-world [:smas buf-id] state)
-                                  state)]
+                      (let [s (get-in @ago-world [:smas (chan-buf-id ago-ch)] state)]
                         (ioc-macros/aset-all! s ioc-helpers/VALUE-IDX
                                               ret-val ioc-helpers/STATE-IDX blk)
                         (ioc-helpers/run-state-machine-wrapped s))))))]
@@ -299,9 +297,13 @@
   (ioc-macros/aset-all! state ioc-helpers/STATE-IDX cont-block)
   (when-let [cb (cljs.core.async/do-alts
                  (fn [val]
-                   (let [[v c] val]
-                     (when (seqv-alive? (chan-ago-world c) (chan-seqv c))
-                       (ioc-macros/aset-all! state ioc-helpers/VALUE-IDX val)
+                   (let [[v c] val
+                         ago-ch (aget state ioc-helpers/USER-START-IDX)
+                         ago-world (chan-ago-world ago-ch)
+                         s (get-in @ago-world [:smas (chan-buf-id ago-ch)] state)]
+                     (when (and (seqv-alive? ago-world (chan-seqv ago-ch))
+                                (seqv-alive? ago-world (chan-seqv c)))
+                       (ioc-macros/aset-all! s ioc-helpers/VALUE-IDX val)
                        (ioc-helpers/run-state-machine-wrapped state))))
                  ports
                  opts)]

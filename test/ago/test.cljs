@@ -22,7 +22,6 @@
 (defn child [agw in-ch]
   (ago agw
        (let [msg (<! in-ch)]
-         (println "yo" msg)
          msg)))
 
 (defn child2 [agw in-ch]
@@ -254,7 +253,43 @@
           (assert (= (<! ch0) 4))
           (>! cc1 true)
           (assert (= (<! ch1) 1))
-          (ago-restore agw ss) ; Restore!
+
+          (ago-restore agw ss) ; Restore to see msgs roll back.
+          (>! cc0 true)
+          (assert (= (<! ch0) 2))
+          (>! cc0 true)
+          (assert (= (<! ch0) 3))
+          (>! cc0 true)
+          (assert (= (<! ch0) 4))
+          (>! cc1 true)
+          (assert (= (<! ch1) 1))
+
+          (ago-restore agw ss) ; Restore to see msgs roll back, again.
+          (>! cc0 true)
+          (assert (= (<! ch0) 2))
+          (>! cc0 true)
+          (assert (= (<! ch0) 3))
+          (>! cc0 true)
+          (assert (= (<! ch0) 4))
+          (>! cc1 true)
+          (assert (= (<! ch1) 1))
+
+          (ago-restore agw ss) ; Restore to see msgs roll back, again.
+          (>! cc0 true)
+          (assert (= (<! ch0) 2))
+          (>! cc0 true)
+          (assert (= (<! ch0) 3))
+          (>! cc0 true)
+          (assert (= (<! ch0) 4))
+          (>! cc1 true)
+          (assert (= (<! ch1) 1))
+
+          (close! cc0) ; Now close the channels.
+          (close! cc1)
+          (assert (= (<! ch0) nil))
+          (assert (= (<! ch1) nil))
+
+          (ago-restore agw ss) ; Restore after channel closures.
           (>! cc0 true)
           (assert (= (<! ch0) 2))
           (>! cc1 true)
@@ -263,6 +298,7 @@
           (close! cc1)
           (assert (= (<! ch0) nil))
           (assert (= (<! ch1) nil))
+
           (reset! all-done true)))
     (loop []
       (when (not @all-done)
