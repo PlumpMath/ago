@@ -193,8 +193,7 @@
       (assert (= (cljs.core.async.impl.protocols/full? b2) false))
       (assert (= (.pop b2) nil))
       (assert (= (count b2) 0))
-      (assert (= (cljs.core.async.impl.protocols/full? b2) false))
-)))
+      (assert (= (cljs.core.async.impl.protocols/full? b2) false)))))
 
 (defn test-put-take [chan-size]
   (println "test-put-take" chan-size)
