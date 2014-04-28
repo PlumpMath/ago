@@ -45,7 +45,7 @@
            :logical-ms 0      ; Logical time/msecs, which is always updated
            :physical-ms (now) ; at the same time as physical-ms time snapshot.
            :timeouts (sorted-map) ; Keyed by logical-ms => '(timeout-ch ...).
-           })))
+           })))                   ; TODO: The :closed map needs GC.
 
 (defn seqv+ [ago-world-now]
   (if (zero? (:logical-speed ago-world-now)) ; No seqv inc when at zero speed.
@@ -323,9 +323,43 @@
 
 ; --------------------------------------------------------
 
+(def curr-js-timeout-id (atom nil)) ; Value is nil or js-timeout-id.
+
+(defn timeout-handler [ago-world]
+  (swap! ago-world seqv+) ; Updates logical-ms.
+  (swap! curr-js-timeout-id (fn [x]
+                              (when x (js/cancelTimeout x))
+                              nil))
+  (let [logical-ms (:logical-ms @ago-world)
+        timeouts2 (loop [timeouts (:timeouts @ago-world)]
+                    (if-let [[soonest-ms chs] (first timeouts)]
+                      (if (<= soonest-ms logical-ms)
+                        (do (doseq [ch chs]
+                              (protocols/close! ch))
+                            (recur (dissoc timeouts soonest-ms)))
+                        timeouts)))]
+    (swap! ago-world #(assoc % :timeouts timeouts2))
+    (when-let [[soonest-ms chs] (first timeouts2)]
+      (let [tid (js/setTimeout (fn [] (timeout-handler ago-world))
+                               (- soonest-ms logical-ms))]
+        (reset! curr-js-timeout-id tid)))))
+
+(defn ago-timeout [ago-world delay-ms] ; Logical milliseconds from now.
+  (let [timeout-at (+ delay-ms (:logical-ms @ago-world))
+        timeout-ch (ago-chan-buf ago-world nil
+                                 (str "timeout-" ((:gen-id @ago-world))))]
+    (swap! ago-world                               ; Persistent sorted-map for
+           #(update-in % [:timeouts]               ; timeouts instead of skip-list
+                       (fn [m] (assoc m timeout-at ; to provide snapshot'ability.
+                                      (conj (get-in % [:timeouts timeout-at])
+                                            timeout-ch)))))
+    (timeout-handler ago-world)
+    timeout-ch))
+
+; --------------------------------------------------------
+
 (defn copy-sma-map [sma-map] ; Copy a hash-map of <buf-id => state-machine-array>.
-  (apply hash-map (mapcat (fn [[buf-id sma]] [buf-id (aclone sma)])
-                          sma-map)))
+  (apply hash-map (mapcat (fn [[buf-id sma]] [buf-id (aclone sma)]) sma-map)))
 
 (defn ago-snapshot [ago-world]
   (let [ago-world-now @ago-world]
@@ -342,51 +376,19 @@
                                                                   (:smas-new ss)
                                                                   (:smas-new @ago-world))
           branch-id (- ((:gen-id @ago-world)))] ; Negative in case snapshot re-restored.
-      (swap! ago-world
-             #(-> %
-                  (assoc :seqv (conj (:seqv ss) branch-id 0))
-                  (assoc :bufs (:bufs ss))
-                  (assoc :smas recycled-smas)
-                  (assoc :smas-new recycled-smasN)
-                  (assoc :closed (:closed ss))
-                  (assoc :logical-ms (:logical-ms ss))
-                  (assoc :physical-ms (now))))
+      (swap! ago-world #(-> %
+                            (assoc :seqv (conj (:seqv ss) branch-id 0))
+                            (assoc :bufs (:bufs ss))
+                            (assoc :smas recycled-smas)
+                            (assoc :smas-new recycled-smasN)
+                            (assoc :closed (:closed ss))
+                            (assoc :logical-ms (:logical-ms ss))
+                            (assoc :physical-ms (now))
+                            (assoc :timeouts (:timeouts ss))))
       (doseq [[sma-old ss-buf-id] reborn-smas]
         (ago-revive-state-machine ago-world sma-old ss-buf-id))
       (doseq [[sma-old ss-buf-id] reborn-smasN]
         (ago-revive-state-machine ago-world sma-old ss-buf-id))
+      (when (seq (:timeouts @ago-world))
+        (timeout-handler ago-world))
       ago-world))
-
-; --------------------------------------------------------
-
-(def curr-js-timeout-id (atom nil)) ; Value is nil or js-timeout-id.
-
-(defn timeout-handler [ago-world]
-  (swap! ago-world seqv+) ; Updates logical-ms.
-  (swap! curr-js-timeout-id (fn [x]
-                              (when x (js/cancelTimeout x))
-                              nil))
-  (let [logical-ms (:logical-ms @ago-world)
-        timeouts2 (loop [timeouts (:timeouts @ago-world)]
-                    (if-let [[soonest-ms chs] (first timeouts)]
-                      (if (<= soonest-ms logical-ms)
-                        (do (doseq [ch chs]
-                              (protocols/close! ch))
-                            (recur (dissoc timeouts soonest-ms)))
-                        timeouts)))]
-    (when-let [[soonest-ms chs] (first timeouts2)]
-      (reset! curr-js-timeout-id
-              (js/setTimeout #(timeout-handler ago-world)
-                             (- soonest-ms logical-ms))))
-    (swap! ago-world #(assoc % :timeouts timeouts2))))
-
-(defn ago-timeout [ago-world delay-ms] ; Logical milliseconds from now.
-  (let [timeout-at (+ delay-ms (:logical-ms @ago-world))
-        timeout-ch (ago-chan-buf ago-world nil
-                                 (str "timeout-" ((:gen-id @ago-world))))]
-    (swap! ago-world                               ; Persistent sorted-map for
-           #(update-in % [:timeouts]               ; timeouts instead of skip-list
-                       (fn [m] (assoc m timeout-at ; to provide snapshot'ability.
-                                      (conj (get-in % [:timeouts timeout-at])
-                                            timeout-ch)))))
-    (timeout-handler ago-world)))
