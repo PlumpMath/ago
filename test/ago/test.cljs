@@ -4,7 +4,7 @@
   (:require [cljs.core.async.impl.dispatch]
             [cljs.core.async :refer [chan close! <! >! alts! put! take!]]
             [ago.core :refer [make-ago-world ago-chan ago-snapshot ago-restore
-                              seqv+ compare-seqvs seqv-alive?]]
+                              seqv+ compare-seqvs seqv-alive? ago-timeout]]
             [goog.dom :as gdom]
             [goog.events :as gevents]))
 
@@ -306,6 +306,50 @@
         (recur)))
     @all-done))
 
+(defn test-timeout [chan-size]
+  (println "test-timeout" chan-size)
+  (let [agw (make-ago-world nil)
+        ch0 (ago-chan agw chan-size)
+        timer0 (ago agw
+                    (<! (ago-timeout agw 500))
+                    (println "timer aa fired")
+                    (>! ch0 :aa)
+                    (<! (ago-timeout agw 400))
+                    (println "timer bb fired")
+                    (>! ch0 :bb)
+                    (close! ch0)
+                    :timer0-done)
+        all-done (atom false)]
+    (go (assert (= (<! ch0) :aa))
+        (let [ss1 (ago-snapshot agw)]
+          (assert (= (<! ch0) :bb))
+          (assert (= (<! ch0) nil))
+          (assert (= (<! timer0) :timer0-done))
+          (assert (= (<! timer0) nil))
+
+          (println "restoring ss1...")
+          (ago-restore agw ss1)
+          (println "restoring ss1 done")
+          (assert (= (<! ch0) :bb))
+          (assert (= (<! ch0) nil))
+          (assert (= (<! timer0) :timer0-done))
+          (assert (= (<! timer0) nil))
+
+          (reset! all-done true)))
+    (loop []
+      (when (not @all-done)
+        (if (> (.-length cljs.core.async.impl.dispatch/tasks) 0)
+          (do (cljs.core.async.impl.dispatch/process-messages)
+              (recur))
+          (if @ago.core/curr-js-timeout-id
+            (if-let [[soonest-ms chs] (first (:timeouts @agw))]
+              (do (swap! agw #(assoc % :logical-ms soonest-ms))
+                  (ago.core/timeout-handler agw)
+                  (recur))
+              (println :UNEXPECTED "no tasks and no timeouts" @all-done))
+            (println :UNEXPECTED "no tasks and no timeout" @all-done)))))
+    (assert (= @all-done true))))
+
 (defn ^:export run []
   (println "ago test run started.")
   (test-constructors)
@@ -319,5 +363,8 @@
   (test-snapshot-restore 0)
   (test-snapshot-restore 1)
   (test-snapshot-restore 10)
+  (test-timeout 0)
+  (test-timeout 1)
+  (test-timeout 10)
   (println "ago test run PASS.")
   success)
