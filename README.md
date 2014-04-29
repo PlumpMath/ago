@@ -1,4 +1,6 @@
-# ago - time travel for clojurescript core.async
+# ago - [![Build Status](https://travis-ci.org/steveyen/ago.png?branch=master)](https://travis-ci.org/steveyen/ago)
+
+A time travel library for clojurescript core.async
 
 The "ago" library provides a limited form of time-travel (snapshots
 and restores) on top of (clojurescript) core.async.
