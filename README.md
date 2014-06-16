@@ -46,7 +46,6 @@ functions, like...
 
     (ns my-application
       (:require-macros [ago.macros :refer [ago]])
-k
       (:require [cljs.core.async :refer [close! <! >! alts! put! take!]]
                 [ago.core :refer [make-ago-world ago-chan ago-timeout
                                   ago-snapshot ago-restore]]))
