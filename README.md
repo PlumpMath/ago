@@ -17,27 +17,31 @@ That is, I used go routines for the clients & servers
 and used channels to hook them up together.
 
 By using clojurescript core.async, too, I could run my simulated
-"distrbuted system" as a single page application in a web browser and
-get a quick GUI and visualization of everything happening in the
-simulation.
+"distrbuted system" as a 100% client-side, single page application in
+a web browser and get a quick GUI and visualization of everything
+happening in the simulation.
 
 But, one issue was it wasn't clear how to "rewind the world" back to a
-previous simulation state so that one can play "what-if" games with
+previous simulation state so that I could play "what-if" games with
 the simulated world.
 
 That is, I wanted to snapshot all the inflight go routines, channels,
 messages, timeouts and all their inherent state, and then later
 restore the world to some previous snapshot.
 
-The "ago" library, which is built on top of clojurescript core.async,
+The ago library, which is built on top of clojurescript core.async,
 is meant to provide that snapshot and restore ability, so that one
 can have "TiVo for clojurescript core.async".
+
+Or, as I like to say...
+
+    ago lets you go backwards in your go routines to sometime ago
 
 ## How To Use ago
 
 ### require
 
-First, you'll need to require the right clojurescript macros and
+First, you'll need to require the relevant clojurescript macros and
 functions, like...
 
     (ns my-application
@@ -48,15 +52,15 @@ functions, like...
 
 ### API: make-ago-world
 
-There's an API function (make-ago-world app-data) to create a
-world-handle, which is an atom that tracks everything about a
-snapshot'able world.  You must also supply some opaque app-data (use
-that app-data for whatever you want) that will be associated with the
-world-handle...
+The make-ago-world API function creates a world-handle, which is an
+atom where the ago library uses to track everything about a
+snapshot'able world.
 
 * (make-ago-world some-opaque-app-data) => world-handle
 
-Or perhaps...
+You must also supply some opaque app-data (use that app-data
+for whatever you want) that will be associated with the
+world-handle. This can also be nil...
 
 * (make-ago-world nil) => world-handle
 
@@ -142,6 +146,10 @@ to help during development...
 
     lein cljsbuild auto
 
+### Tests
+
+    lein cljsbuild test
+
 ## Underneath The Hood
 
 This section might be interesting only to those folks who get into how
@@ -192,7 +200,6 @@ Channel/Buffer/Handler protocols can easily break ago.
 
 ## TODO
 
-* Learn about automated build / test passing badges.
 * Need to learn how to publish libraries in clojure (clojars.org?).
 * Need docs.
 * Need examples.
