@@ -75,13 +75,13 @@ API's usually have an additional first parameter of a world-handle.
 
 For example, instead of (go ...), use...
 
-    (ago world-handle ...)
+    (ago world-handle ...) => chan
 
 ### API: ago-chan
 
 Instead of (chan), use...
 
-    (ago-chan world-handle)
+    (ago-chan world-handle) => chan
 
 ### Example
 
@@ -102,7 +102,7 @@ world-handle.  For example, instead of writing...
 
 To snapshot a world, use...
 
-    (ago-snapshot world-handle)
+    (ago-snapshot world-handle) => snapshot
 
 For example...
 
@@ -120,7 +120,7 @@ To restore a world-handle to a previous snapshot, use...
 
 Instead of (timeout delay), use...
 
-    (ago-timeout world-handle delay)
+    (ago-timeout world-handle delay) => chan
 
 If you use the ago-timeout feature, you may want to slow down
 or speed up simulation time (or "logical time").
