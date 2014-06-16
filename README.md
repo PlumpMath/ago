@@ -3,7 +3,7 @@
 A time travel library for clojurescript core.async
 
 The "ago" library provides a limited form of time travel (snapshots
-and restores) on top of (clojurescript) core.async.
+and restores) on top of clojurescript core.async.
 
 ## Rationale
 
@@ -33,27 +33,47 @@ The "ago" library, which is built on top of clojurescript core.async,
 is meant to provide that snapshot and restore ability, so that one
 can have "TiVo for clojurescript core.async".
 
-## How To Use This
+## How To Use ago
 
-The "ago" library provides API's which wrap around the main API's of
-core.async.  These ago wrapper functions and macros should only be
-used where you want snapshot/rewind-ability, as they have additional
-overhead (from using immutable/persistent data structures).
+### require
 
-The ago library API's usually have a first parameter of a
-"world-handle".  For example...
+First, you'll need to require the right clojurescript macros and
+functions, like...
 
-* Instead of (go ...) it's (ago world-handle ...)
-* Instead of (chan) it's (ago-chan world-handle)
-* Instead of (timeout delay) it's (ago-timeout world-handle delay)
+    (ns my-application
+      (:require-macros [ago.macros :refer [ago]])
+      (:require [cljs.core.async :refer [close! <! >! alts! put! take!]]
+                [ago.core :refer [make-ago-world ago-chan ago-timeout
+                                  ago-snapshot ago-restore]]))
 
-There's an API function (make-ago-world) to create a world-handle.
-You can also supply an associated, opaque app-data (use that app-data
-for whatever you want)...
+### API: make-ago-world
 
-* (make-ago-world app-data) => world-handle
+There's an API function (make-ago-world app-data) to create a
+world-handle, which is an atom that tracks everything about a
+snapshot'able world.  You must also supply some opaque app-data (use
+that app-data for whatever you want) that will be associated with the
+world-handle...
 
-Then you can create "ago channels" and "ago routines" with that
+* (make-ago-world some-opaque-app-data) => world-handle
+
+Or perhaps...
+
+* (make-ago-world nil) => world-handle
+
+### creation functions
+
+The ago library provides an alternative or twin set of API's which
+wrap around the main creation API's of core.async.  These mirrored
+API's usually have an additional first parameter of a "world-handle"...
+
+* ago
+** Instead of (go ...) it's (ago world-handle ...)
+* ago-chan
+** Instead of (chan) it's (ago-chan world-handle)
+* ago-timeout
+** Instead of (timeout delay) it's (ago-timeout world-handle delay)
+
+So, you would create "ago channels" and "ago routines", passing in a
 world-handle.  So instead of writing...
 
     (let [ch1 (chan)]
@@ -66,23 +86,21 @@ world-handle.  So instead of writing...
       (ago world-handle (>! ch1 "hello world"))
       (ago world-handle ["I received" (<! ch1)]))
 
-And, to snapshot a world, using ago-snapshot...
+### API: ago-snapshot
+
+To snapshot a world, use ago-snapshot...
 
     (let [snapshot (ago-snapshot world-handle)]
       ...
       )
 
-And, to restore a previous snapshot...
+### API: ago-restore
+
+To restore a previous snapshot...
 
     (ago-restore world-handle snapshot)
 
-Because the ago routines and ago channels have additional overhead,
-you should use regular clojurescript core.async API functions (go,
-chan, timeout) for areas that you don't want to snapshot (i.e., not
-part of your simulation/model), such as GUI-related go routines that
-are handling button clicks or rendering output.
-
-### Time
+### API: ago-timeout
 
 If you use the ago-timeout feature, you may want to slow down
 or speed up simulation time (or "logical time").
@@ -90,7 +108,8 @@ or speed up simulation time (or "logical time").
 That is, there's a distinction between logical time and physical clock
 time, where logical time can proceed at a different pace than physical
 clock time.  Just set the :logical-speed value in a world-handle to
-not 1.0.
+not 1.0.  That is, you could replay your movie in super slow-mo
+so that you can actually watch normally fast timeouts happening.
 
 Of note, logical time can rollback to lower values when you restore a
 previous snapshot, which can have interesting, unintended rendering
@@ -103,6 +122,12 @@ Logical time starts at 0 when you invoke (make-ago-world ...).
 
 The snapshotting and rewinding in ago works only if you use
 immutable/persistent data structures throughout your go routines.
+
+Because the ago routines and ago channels have additional overhead,
+you should use regular clojurescript core.async API functions (go,
+chan, timeout) for areas that you don't want to snapshot (i.e., not
+part of your simulation/model), such as GUI-related go routines that
+are handling button clicks or rendering output.
 
 ## LICENSE
 
