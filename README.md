@@ -29,7 +29,8 @@ That is, I wanted to...
 * snapshot all the inflight go routines, channels, messages, timeouts
   and all their inherent state;
 * take multiple snapshots over time;
-* and finally, later restore the world to some previous snapshot.
+* and finally, later restore the world to some previous snapshot
+  and restart the world from exactly that point in time.
 
 The ago library, which is built on top of clojurescript core.async,
 is meant to provide that snapshot and restore ability, so that one
@@ -66,23 +67,23 @@ world-handle. This can also be nil...
 
     (make-ago-world nil) => world-handle
 
-### API: ago, ago-chan, ago-timeout
+### API: ago
 
 The ago library provides an alternative or twin set of API's which
 wrap around the main creation API's of core.async.  These mirrored
-API's usually have an additional first parameter of a "world-handle"...
+API's usually have an additional first parameter of a world-handle.
+
+For example, instead of (go ...), use...
 
     (ago world-handle ...)
 
-Instead of (go ...), use (ago world-handle ...).
+### API: ago-chan
+
+Instead of (chan), use...
 
     (ago-chan world-handle)
 
-Instead of (chan), use (ago-chan world-handle).
-
-    (ago-timeout world-handle)
-
-Instead of (timeout delay), use (ago-timeout world-handle delay).
+### Example
 
 So, you would create "ago channels" and "ago routines", passing in a
 world-handle.  For example, instead of writing...
@@ -99,7 +100,11 @@ world-handle.  For example, instead of writing...
 
 ### API: ago-snapshot
 
-To snapshot a world, use ago-snapshot...
+To snapshot a world, use...
+
+    (ago-snapshot world-handle)
+
+For example...
 
     (let [snapshot (ago-snapshot world-handle)]
       ...
@@ -107,11 +112,15 @@ To snapshot a world, use ago-snapshot...
 
 ### API: ago-restore
 
-To restore a world-handle to a previous snapshot...
+To restore a world-handle to a previous snapshot, use...
 
     (ago-restore world-handle snapshot)
 
 ### API: ago-timeout
+
+Instead of (timeout delay), use...
+
+    (ago-timeout world-handle delay)
 
 If you use the ago-timeout feature, you may want to slow down
 or speed up simulation time (or "logical time").
