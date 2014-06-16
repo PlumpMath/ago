@@ -21,19 +21,21 @@ By using clojurescript core.async, too, I could run my simulated
 a web browser and get a quick GUI and visualization of everything
 happening in the simulation.
 
-But, one issue was it wasn't clear how to "rewind the world" back to a
-previous simulation state so that I could play "what-if" games with
-the simulated world.
+But, it wasn't clear how to "rewind the world" back to a previous
+simulation state so that I could play "what-if" games with the
+simulated world.
 
-That is, I wanted to snapshot all the inflight go routines, channels,
-messages, timeouts and all their inherent state, and then later
-restore the world to some previous snapshot.
+That is, I wanted to...
+* snapshot all the inflight go routines, channels, messages, timeouts
+  and all their inherent state;
+* take multiple snapshots over time;
+* and finally, later restore the world to some previous snapshot.
 
 The ago library, which is built on top of clojurescript core.async,
 is meant to provide that snapshot and restore ability, so that one
 can have "TiVo for clojurescript core.async".
 
-Or, as I like to say...
+Or, as one might say...
 
     ago lets you go backwards in your go routines to sometime ago
 
@@ -53,32 +55,37 @@ functions, like...
 ### API: make-ago-world
 
 The make-ago-world API function creates a world-handle, which is an
-atom where the ago library uses to track everything about a
+atom where the ago library tracks everything about a
 snapshot'able world.
 
-* (make-ago-world some-opaque-app-data) => world-handle
+    (make-ago-world some-opaque-app-data) => world-handle
 
 You must also supply some opaque app-data (use that app-data
 for whatever you want) that will be associated with the
 world-handle. This can also be nil...
 
-* (make-ago-world nil) => world-handle
+    (make-ago-world nil) => world-handle
 
-### creation functions
+### API: ago, ago-chan, ago-timeout
 
 The ago library provides an alternative or twin set of API's which
 wrap around the main creation API's of core.async.  These mirrored
 API's usually have an additional first parameter of a "world-handle"...
 
-* ago
-** Instead of (go ...) it's (ago world-handle ...)
-* ago-chan
-** Instead of (chan) it's (ago-chan world-handle)
-* ago-timeout
-** Instead of (timeout delay) it's (ago-timeout world-handle delay)
+    (ago world-handle ...)
+
+Instead of (go ...), use (ago world-handle ...).
+
+    (ago-chan world-handle)
+
+Instead of (chan), use (ago-chan world-handle).
+
+    (ago-timeout world-handle)
+
+Instead of (timeout delay), use (ago-timeout world-handle delay).
 
 So, you would create "ago channels" and "ago routines", passing in a
-world-handle.  So instead of writing...
+world-handle.  For example, instead of writing...
 
     (let [ch1 (chan)]
       (go (>! ch1 "hello world"))
@@ -100,7 +107,7 @@ To snapshot a world, use ago-snapshot...
 
 ### API: ago-restore
 
-To restore a previous snapshot...
+To restore a world-handle to a previous snapshot...
 
     (ago-restore world-handle snapshot)
 
@@ -125,7 +132,7 @@ Logical time starts at 0 when you invoke (make-ago-world ...).
 ### Limitations
 
 The snapshotting and rewinding in ago works only if you use
-immutable/persistent data structures throughout your go routines.
+immutable/persistent data structures throughout your ago routines.
 
 Because the ago routines and ago channels have additional overhead,
 you should use regular clojurescript core.async API functions (go,
