@@ -2,46 +2,43 @@
 
 A time travel library for clojurescript core.async
 
-The "ago" library provides a limited form of time-travel (snapshots
+The "ago" library provides a limited form of time travel (snapshots
 and restores) on top of (clojurescript) core.async.
 
-## Motivations
+## Rationale
 
-This library was originally meant to help folks who are building
-discrete event models and simulations.  For example, I was trying to
-model and simulate the clients, servers and network protocols of a
-distributed system, and core.async was a good building block to
-model all the concurrent activity.
+The ago library came about because I was using core.async to handle
+concurrent tasks.  In particular, I was trying to simulate some
+concurrent clients, servers and network protocols of a "fake"
+distributed system, and core.async was a good building block to model
+all the concurrent activity.
 
-By using clojurescript, too, I could run my simulations in modern web
-browsers and get an easy to use GUI and nice visualizations (svg, css).
+That is, I used go routines for the clients & servers
+and used channels to hook them up together.
 
-But, one issue was that it was not clear how to "rewind the world"
-back to a previous state so that one can replay a simulation (and
-perhaps take alternative "what-if" pathways).
+By using clojurescript core.async, too, I could run my simulated
+"distrbuted system" as a single page application in a web browser and
+get a quick GUI and visualization of everything happening in the
+simulation.
 
-What I wanted was to snapshot all the inflight go routines, channels,
-timeouts and all their inherent state ("snapshot"), and then later
-restore the simulated world to that previous snapshot ("rewind" or
-"restore").
+But, one issue was it wasn't clear how to "rewind the world" back to a
+previous simulation state so that one can play "what-if" games with
+the simulated world.
 
-The vision is that UI frameworks like Om
-(https://github.com/swannodette/om) allow for easy rollback or undo
-and redo of app-state (yay, immutable/persistent data structures).  In
-my case, I wanted a big part of the app-state to be a bunch of
-go routines and channels and to be able to undo/redo all that
-asynchronous activity.
+That is, I wanted to snapshot all the inflight go routines, channels,
+messages, timeouts and all their inherent state, and then later
+restore the world to some previous snapshot.
 
 The "ago" library, which is built on top of clojurescript core.async,
 is meant to provide that snapshot and restore ability, so that one
-can have "TiVo for your simulation".
+can have "TiVo for clojurescript core.async".
 
-## How To Use
+## How To Use This
 
 The "ago" library provides API's which wrap around the main API's of
-core.async.  These ago wrapper functions should only be used where you
-want snapshot/rewind-ability, as they have additional overhead (from
-using immutable/persistent data structures).
+core.async.  These ago wrapper functions and macros should only be
+used where you want snapshot/rewind-ability, as they have additional
+overhead (from using immutable/persistent data structures).
 
 The ago library API's usually have a first parameter of a
 "world-handle".  For example...
@@ -50,19 +47,24 @@ The ago library API's usually have a first parameter of a
 * Instead of (chan) it's (ago-chan world-handle)
 * Instead of (timeout delay) it's (ago-timeout world-handle delay)
 
-There's an API to create a world-handle, where you can provide an
-associated, opaque app-data (use app-data for whatever you want)...
+There's an API function (make-ago-world) to create a world-handle.
+You can also supply an associated, opaque app-data (use that app-data
+for whatever you want)...
 
 * (make-ago-world app-data) => world-handle
 
 Then you can create "ago channels" and "ago routines" with that
-world-handle...
+world-handle.  So instead of writing...
+
+    (let [ch1 (chan)]
+      (go (>! ch1 "hello world"))
+      (go ["I received" (<! ch1)]))
+
+...you would instead use the ago equivalent API, like...
 
     (let [ch1 (ago-chan world-handle)]
-      (ago world-handle
-        (>! ch1 "hello world"))
-      (ago world-handle
-        ["I received" (<! ch1)]))
+      (ago world-handle (>! ch1 "hello world"))
+      (ago world-handle ["I received" (<! ch1)]))
 
 And, to snapshot a world, using ago-snapshot...
 
@@ -88,7 +90,7 @@ or speed up simulation time (or "logical time").
 That is, there's a distinction between logical time and physical clock
 time, where logical time can proceed at a different pace than physical
 clock time.  Just set the :logical-speed value in a world-handle to
-not 1.0.  This may be useful for some kinds of simulations.
+not 1.0.
 
 Of note, logical time can rollback to lower values when you restore a
 previous snapshot, which can have interesting, unintended rendering
@@ -96,6 +98,11 @@ effects if you're just doing simple delta "functional reactive" style
 visualizations.
 
 Logical time starts at 0 when you invoke (make-ago-world ...).
+
+### Limitations
+
+The snapshotting and rewinding in ago works only if you use
+immutable/persistent data structures throughout your go routines.
 
 ## LICENSE
 
@@ -123,7 +130,8 @@ ago library can then register those state machine arrays into its
 world-handle.
 
 A world-handle is a just an atom to an immutable/persistent
-associative hash-map.
+associative hash-map that holds onto those state machine arrays
+and other stuff.
 
 Also, instead of using clojurescript core.async's default buffer
 implementation (a mutable RingBuffer), the ago library instead
@@ -159,17 +167,15 @@ Channel/Buffer/Handler protocols can easily break ago.
 
 ## TODO
 
-* Need to learn how to test in clojurescript.
 * Learn about automated build / test passing badges.
 * Need to learn how to publish libraries in clojure (clojars.org?).
 * Need docs.
 * Need examples.
 * Need to learn cljx.
-* Run this in nodejs/v8?
+* Run this in nodejs/v8 on the server-side?
 * Figure out how to use this in clojure/JVM.
 * Figure out how to serialize/deserialize a snapshot.
   (e.g, save a snapshot to a file.)
-  This will be difficult due to lots of state stuck in closures.
-  Probably have to define some onerous app limitations to allow for
+  This may be challenging if there's lots of state stuck in closures.
+  Probably have to define some more app coding limitations to allow for
   serialization/deserialization.
-
