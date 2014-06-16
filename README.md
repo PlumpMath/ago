@@ -74,7 +74,7 @@ For example, instead of...
 
     (go ...)
 
-Use...
+...use...
 
     (ago world-handle ...) ; returns a chan
 
@@ -103,11 +103,11 @@ world-handle.  For example, instead of writing...
 
 To snapshot a world, use...
 
-    (ago-snapshot world-handle) ; returns a snapshot handle
+    (ago-snapshot world-handle) ; returns a snapshot-handle
 
 For example...
 
-    (let [snapshot (ago-snapshot world-handle)]
+    (let [snapshot-handle (ago-snapshot world-handle)]
       ...
       )
 
@@ -115,7 +115,7 @@ For example...
 
 To restore a world-handle to a previous snapshot, use...
 
-    (ago-restore world-handle snapshot)
+    (ago-restore world-handle snapshot-handle)
 
 ### API: ago-timeout
 
@@ -218,7 +218,7 @@ Channel/Buffer/Handler protocols can easily break ago.
 ## TODO
 
 * Need to learn how to publish libraries in clojure (clojars.org?).
-* Need docs.
+* Need auto-generated docs.
 * Need examples.
 * Need to learn cljx.
 * Run this in nodejs/v8 on the server-side?
