@@ -11,32 +11,29 @@ The ago library came about because I was using core.async to handle
 concurrent tasks.  In particular, I was trying to simulate some
 concurrent clients, servers and network protocols of a "fake"
 distributed system, and core.async was a good building block to model
-all the concurrent activity.
-
-That is, I used go routines for the clients & servers
-and used channels to hook them up together.
+all the concurrent activity.  (I used go routines for the client &
+server "processes" and used channels to hook them up together.)
 
 By using clojurescript core.async, too, I could run my simulated
-"distrbuted system" as a 100% client-side, single page application in
-a web browser and get a quick GUI and visualization of everything
-happening in the simulation.
+"distrbuted system" as a 100% client-side, single page application and
+get a quick web browser GUI and visualization of everything happening
+in the simulation.
 
 But, it wasn't clear how to "rewind the world" back to a previous
 simulation state so that I could play "what-if" games with the
 simulated world.
 
 That is, I wanted to...
-* snapshot all the inflight go routines, channels, messages, timeouts
-  and all their inherent state;
+* snapshot all the inflight go routines, channels, messages,
+  timeouts and all their inherent state;
 * take multiple snapshots over time;
 * and finally, later restore the world to some previous snapshot
   and restart the world from exactly that point in time.
 
-The ago library, which is built on top of clojurescript core.async,
-is meant to provide that snapshot and restore ability, so that one
-can have "TiVo for clojurescript core.async".
+The ago library is meant to provide that snapshot and restore ability,
+so that one can have "TiVo for clojurescript core.async".
 
-Or, as one might say...
+Or, if you like synonyms...
 
     ago lets you go backwards in your go routines to sometime ago
 
@@ -49,6 +46,7 @@ functions, like...
 
     (ns my-application
       (:require-macros [ago.macros :refer [ago]])
+k
       (:require [cljs.core.async :refer [close! <! >! alts! put! take!]]
                 [ago.core :refer [make-ago-world ago-chan ago-timeout
                                   ago-snapshot ago-restore]]))
@@ -59,13 +57,13 @@ The make-ago-world API function creates a world-handle, which is an
 atom where the ago library tracks everything about a
 snapshot'able world.
 
-    (make-ago-world some-opaque-app-data) => world-handle
+    (make-ago-world app-data) ; returns a world-handle.
 
 You must also supply some opaque app-data (use that app-data
 for whatever you want) that will be associated with the
 world-handle. This can also be nil...
 
-    (make-ago-world nil) => world-handle
+    (make-ago-world nil)
 
 ### API: ago
 
@@ -73,15 +71,19 @@ The ago library provides an alternative or twin set of API's which
 wrap around the main creation API's of core.async.  These mirrored
 API's usually have an additional first parameter of a world-handle.
 
-For example, instead of (go ...), use...
+For example, instead of...
 
-    (ago world-handle ...) => chan
+    (go ...)
+
+Use...
+
+    (ago world-handle ...) ; returns a chan
 
 ### API: ago-chan
 
 Instead of (chan), use...
 
-    (ago-chan world-handle) => chan
+    (ago-chan world-handle) ; returns a chan
 
 ### Example
 
@@ -102,7 +104,7 @@ world-handle.  For example, instead of writing...
 
 To snapshot a world, use...
 
-    (ago-snapshot world-handle) => snapshot
+    (ago-snapshot world-handle) ; returns a snapshot handle
 
 For example...
 
@@ -120,7 +122,7 @@ To restore a world-handle to a previous snapshot, use...
 
 Instead of (timeout delay), use...
 
-    (ago-timeout world-handle delay) => chan
+    (ago-timeout world-handle delay) ; returns a chan
 
 If you use the ago-timeout feature, you may want to slow down
 or speed up simulation time (or "logical time").
