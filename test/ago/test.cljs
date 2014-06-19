@@ -50,7 +50,7 @@
     (ago-restore agw @last-snapshot)
     (recur))
   (go-loop []
-    (println (<! out-ch))
+    (println :out (<! out-ch))
     (recur))
   (ago agw
        (loop [num-hi 0 num-bye 0]
