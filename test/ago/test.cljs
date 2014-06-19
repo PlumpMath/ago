@@ -39,7 +39,8 @@
       last-snapshot (atom nil)
       agw (make-ago-world nil)
       ch1 (ago-chan agw 1)
-      ch2 (ago-chan agw 2)]
+      ch2 (ago-chan agw 2)
+      out-ch (ago-chan agw 1)]
   (go-loop []
     (<! stw-ch)
     (reset! last-snapshot (ago-snapshot agw))
@@ -48,9 +49,12 @@
     (<! rtw-ch)
     (ago-restore agw @last-snapshot)
     (recur))
+  (go-loop []
+    (println (<! out-ch))
+    (recur))
   (ago agw
        (loop [num-hi 0 num-bye 0]
-         (println "num-hi" num-hi "num-bye" num-bye)
+         (>! out-ch ["num-hi" num-hi "num-bye" num-bye])
          (let [[x ch] (alts! [hi-ch bye-ch])]
            (cond
             (= ch hi-ch)
@@ -83,7 +87,7 @@
                     (recur num-hi (inc num-bye)))))))))
   (ago agw
        (loop [num-fie 0]
-         (println "num-fie" num-fie)
+         (>! out-ch ["num-fie" num-fie])
          (>! ch2 [:fie num-fie])
          (>! ch2 [:foe num-fie])
          (let [x (<! fie-ch)]
