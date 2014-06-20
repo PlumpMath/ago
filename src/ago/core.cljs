@@ -28,6 +28,17 @@
       m)
     (dissoc m k)))
 
+(defn random-array [n]
+  (let [a (make-array n)]
+    (dotimes [x n] (aset a x 0))
+    (loop [i 1] (if (>= i n)
+                  a
+                  (do
+                    (let [j (rand-int i)]
+                      (aset a i (aget a j))
+                      (aset a j i)
+                      (recur (inc i))))))))
+
 (defn now [] (.now js/Date))
 
 ; --------------------------------------------------------
@@ -45,6 +56,7 @@
            :logical-ms 0      ; Logical time/msecs, which is always updated
            :physical-ms (now) ; at the same time as physical-ms time snapshot.
            :timeouts (sorted-map) ; Keyed by logical-ms => '(timeout-ch ...).
+           :latches {}            ; Keyed by latch-id => true (see make-latch).
            })))                   ; TODO: The :closed map needs GC.
 
 (defn seqv+ [ago-world-now]
@@ -73,6 +85,19 @@
   (if (and ago-world seqv)
     (<= (compare-seqvs seqv (:seqv @ago-world)) 0)
     true)) ; Not an ago managed thing, so assume it's alive.
+
+; --------------------------------------------------------
+
+(defn make-latch [ago-world]
+  ; Unlike the original alt-latch, match-latch keeps state in the ago-world.
+  (let [latch-id ((:gen-id @ago-world))]
+    (swap! ago-world #(assoc-in % [:latches latch-id] true))
+    (reify
+      protocols/Handler
+      (active? [_] (get-in @ago-world [:latches latch-id]))
+      (commit [_]
+        (swap! ago-world #(dissoc-in % [:latches latch-id]))
+        true))))
 
 ; --------------------------------------------------------
 
@@ -292,22 +317,56 @@
           :recur)
       nil)))
 
+(defn alt-handler [latch cb]
+  (reify
+    protocols/Handler
+    (active? [_] (protocols/active? latch))
+    (commit [_]
+      (protocols/commit latch)
+      cb)))
+
+(defn do-alts [ago-world fret ports opts]
+  ; returns derefable [val port] if immediate, nil if enqueued.
+  (let [latch (make-latch ago-world)
+        n (count ports)
+        idxs (random-array n)
+        priority (:priority opts)
+        ret (loop [i 0]
+              (when (< i n)
+                (let [idx (if priority i (aget idxs i))
+                      port (nth ports idx)
+                      wport (when (vector? port) (port 0))
+                      vbox (if wport
+                             (let [val (port 1)]
+                               (protocols/put! wport val
+                                               (alt-handler latch #(fret [% wport]))))
+                             (protocols/take! port
+                                              (alt-handler latch #(fret [% port]))))]
+                  (if vbox
+                    (channels/box [@vbox (or wport port)])
+                    (recur (inc i))))))]
+    (or ret
+        (when (contains? opts :default)
+          (when-let [got (and (protocols/active? latch)
+                              (protocols/commit latch))]
+            (channels/box [(:default opts) :default]))))))
+
 (defn ssa-alts [state cont-block ports & {:as opts}]
-  (ioc-macros/aset-all! state ioc-helpers/STATE-IDX cont-block)
-  (when-let [cb (cljs.core.async/do-alts
-                 (fn [val]
-                   (let [[v c] val
-                         ago-ch (aget state ioc-helpers/USER-START-IDX)
-                         ago-world (chan-ago-world ago-ch)
-                         s (get-in @ago-world [:smas (chan-buf-id ago-ch)] state)]
-                     (when (and (seqv-alive? ago-world (chan-seqv ago-ch))
-                                (seqv-alive? ago-world (chan-seqv c)))
-                       (ioc-macros/aset-all! s ioc-helpers/VALUE-IDX val)
-                       (ioc-helpers/run-state-machine-wrapped state))))
-                 ports
-                 opts)]
-    (ioc-macros/aset-all! state ioc-helpers/VALUE-IDX @cb)
-    :recur))
+  (let [ago-ch (aget state ioc-helpers/USER-START-IDX)
+        ago-world (chan-ago-world ago-ch)]
+    (ioc-macros/aset-all! state ioc-helpers/STATE-IDX cont-block)
+    (when-let [cb (do-alts ago-world
+                           (fn [val]
+                             (let [[v c] val
+                                   s (get-in @ago-world [:smas (chan-buf-id ago-ch)] state)]
+                               (when (and (seqv-alive? ago-world (chan-seqv ago-ch))
+                                          (seqv-alive? ago-world (chan-seqv c)))
+                                 (ioc-macros/aset-all! s ioc-helpers/VALUE-IDX val)
+                                 (ioc-helpers/run-state-machine-wrapped s))))
+                           ports
+                           opts)]
+      (ioc-macros/aset-all! state ioc-helpers/VALUE-IDX @cb)
+      :recur)))
 
 (defn ssa-return-chan [state value]
   (let [^not-native c (aget state ioc-helpers/USER-START-IDX)
@@ -382,7 +441,8 @@
                             (assoc :closed (:closed ss))
                             (assoc :logical-ms (:logical-ms ss))
                             (assoc :physical-ms (now))
-                            (assoc :timeouts (:timeouts ss))))
+                            (assoc :timeouts (:timeouts ss))
+                            (assoc :latches (:latches ss))))
       (doseq [[sma-old ss-buf-id] reborn-smas]
         (ago-revive-state-machine ago-world sma-old ss-buf-id))
       (doseq [[sma-old ss-buf-id] reborn-smasN]
