@@ -40,7 +40,9 @@
       agw (make-ago-world nil)
       ch1 (ago-chan agw 1)
       ch2 (ago-chan agw 2)
-      out-ch (ago-chan agw 1)]
+      out-ch (ago-chan agw 1)
+      ago-hi-ch (ago-chan agw)
+      ago-bye-ch (ago-chan agw)]
   (go-loop []
     (<! stw-ch)
     (reset! last-snapshot (ago-snapshot agw))
@@ -52,12 +54,18 @@
   (go-loop []
     (println :out (<! out-ch))
     (recur))
+  (go-loop []
+    (>! ago-hi-ch (<! hi-ch))
+    (recur))
+  (go-loop []
+    (>! ago-bye-ch (<! bye-ch))
+    (recur))
   (ago agw
        (loop [num-hi 0 num-bye 0]
          (>! out-ch ["num-hi" num-hi "num-bye" num-bye])
-         (let [[x ch] (alts! [hi-ch bye-ch])]
+         (let [[x ch] (alts! [ago-hi-ch ago-bye-ch])]
            (cond
-            (= ch hi-ch)
+            (= ch ago-hi-ch)
             (do (>! ch1 [num-hi x])
                 (let [child-ch (child agw ch1)
                       [num-hi2 x2] (<! child-ch)]
@@ -71,7 +79,7 @@
                              "x" x "num-hi" num-hi
                              "x2" x2 "num-hi2" num-hi2)
                     (recur (inc num-hi) num-bye))))
-            (= ch bye-ch)
+            (= ch ago-bye-ch)
             (let [child-ch (child agw ch1)]
               (>! ch1 [num-bye x])
               (let [[num-bye2 x2] (<! child-ch)]
@@ -84,7 +92,9 @@
                     (println "ERROR"
                              "x" x "num-bye" num-bye
                              "x2" x2 "num-bye2" num-bye2)
-                    (recur num-hi (inc num-bye)))))))))
+                    (recur num-hi (inc num-bye)))))
+            :default
+            (println "ERROR UNKNOWN CHANNEL")))))
   (ago agw
        (loop [num-fie 0]
          (>! out-ch ["num-fie" num-fie])
