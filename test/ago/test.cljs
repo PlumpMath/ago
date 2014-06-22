@@ -464,6 +464,94 @@
         (recur)))
     @all-done))
 
+(defn test-snapshot-restore-child [chan-size]
+  (println "test-snapshot-restore-child" chan-size)
+  (let [agw (make-ago-world nil)
+        cc0 (ago-chan agw chan-size) ; A control channel.
+        ch0 (ago-chan agw chan-size)
+        cc1 (ago-chan agw chan-size) ; A control channel.
+        ch1 (ago-chan agw chan-size)
+        all-done (atom false)]
+    (ago agw ; This is same as echoer0 in previous tests.
+         (ago agw ; Unlike previous tests, this time, echoer1 is child of echoer0.
+              (loop [n 0]
+                (if (<! cc1)
+                  (do (>! ch1 n)
+                      (recur (inc n)))
+                  (close! ch1))))
+         (loop [n 0]
+           (if (<! cc0)
+             (do (>! ch0 n)
+                 (recur (inc n)))
+             (close! ch0))))
+    (go (>! cc0 true)
+        (assert (= (<! ch0) 0))
+        (>! cc0 true)
+        (assert (= (<! ch0) 1))
+        (>! cc1 true)
+        (assert (= (<! ch1) 0))
+        (let [ss (ago-snapshot agw)]
+          (>! cc0 true)
+          (assert (= (<! ch0) 2))
+          (>! cc0 true)
+          (assert (= (<! ch0) 3))
+          (>! cc0 true)
+          (assert (= (<! ch0) 4))
+          (>! cc1 true)
+          (assert (= (<! ch1) 1))
+
+          (ago-restore agw ss) ; Restore to see msgs roll back.
+          (>! cc0 true)
+          (assert (= (<! ch0) 2))
+          (>! cc0 true)
+          (assert (= (<! ch0) 3))
+          (>! cc0 true)
+          (assert (= (<! ch0) 4))
+          (>! cc1 true)
+          (assert (= (<! ch1) 1))
+
+          (ago-restore agw ss) ; Restore to see msgs roll back, again.
+          (>! cc0 true)
+          (assert (= (<! ch0) 2))
+          (>! cc0 true)
+          (assert (= (<! ch0) 3))
+          (>! cc0 true)
+          (assert (= (<! ch0) 4))
+          (>! cc1 true)
+          (assert (= (<! ch1) 1))
+
+          (ago-restore agw ss) ; Restore to see msgs roll back, again.
+          (>! cc0 true)
+          (assert (= (<! ch0) 2))
+          (>! cc0 true)
+          (assert (= (<! ch0) 3))
+          (>! cc0 true)
+          (assert (= (<! ch0) 4))
+          (>! cc1 true)
+          (assert (= (<! ch1) 1))
+
+          (close! cc0) ; Now close the channels.
+          (close! cc1)
+          (assert (= (<! ch0) nil))
+          (assert (= (<! ch1) nil))
+
+          (ago-restore agw ss) ; Restore after channel closures.
+          (>! cc0 true)
+          (assert (= (<! ch0) 2))
+          (>! cc1 true)
+          (assert (= (<! ch1) 1))
+          (close! cc0)
+          (close! cc1)
+          (assert (= (<! ch0) nil))
+          (assert (= (<! ch1) nil))
+
+          (reset! all-done true)))
+    (loop []
+      (when (not @all-done)
+        (cljs.core.async.impl.dispatch/process-messages)
+        (recur)))
+    @all-done))
+
 (defn test-timeout [chan-size]
   (println "test-timeout" chan-size)
   (let [agw (make-ago-world nil)
@@ -521,6 +609,9 @@
   (test-snapshot-restore-alts 0)
   (test-snapshot-restore-alts 1)
   (test-snapshot-restore-alts 10)
+  (test-snapshot-restore-child 0)
+  (test-snapshot-restore-child 1)
+  (test-snapshot-restore-child 10)
   (test-timeout 0)
   (test-timeout 1)
   (test-timeout 10)
