@@ -546,7 +546,7 @@
             (assert (= (<! ch0) nil))
             (assert (= (<! ch1) nil))
 
-            (ago-restore agw ss2) ; Restore something ss2, or a future snapshot.
+            (ago-restore agw ss2) ; Restore ss2, i.e., a future snapshot.
             (>! cc0 true)
             (assert (= (<! ch0) 5))
             (>! cc0 true)
