@@ -425,28 +425,28 @@
         (assoc :smas-new (copy-sma-map (:smas-new ago-world-now))))))
 
 (defn ago-restore [ago-world snapshot]
-    (let [ss (ago-snapshot (atom snapshot)) ; Re-snapshot so snapshot stays immutable.
-          [recycled-smas reborn-smas] (ago-judge-state-machines (:bufs ss)
-                                                                (:smas ss)
-                                                                (:smas @ago-world))
-          [recycled-smasN reborn-smasN] (ago-judge-state-machines (:bufs ss)
-                                                                  (:smas-new ss)
-                                                                  (:smas-new @ago-world))
-          branch-id (- ((:gen-id @ago-world)))] ; Negative in case snapshot re-restored.
-      (swap! ago-world #(-> %
-                            (assoc :seqv (conj (:seqv ss) branch-id 0))
-                            (assoc :bufs (:bufs ss))
-                            (assoc :smas recycled-smas)
-                            (assoc :smas-new recycled-smasN)
-                            (assoc :closed (:closed ss))
-                            (assoc :logical-ms (:logical-ms ss))
-                            (assoc :physical-ms (now))
-                            (assoc :timeouts (:timeouts ss))
-                            (assoc :latches (:latches ss))))
-      (doseq [[sma-old ss-buf-id] reborn-smas]
-        (ago-revive-state-machine ago-world sma-old ss-buf-id))
-      (doseq [[sma-old ss-buf-id] reborn-smasN]
-        (ago-revive-state-machine ago-world sma-old ss-buf-id))
-      (when (seq (:timeouts @ago-world))
-        (timeout-handler ago-world))
-      ago-world))
+  (let [ss (ago-snapshot (atom snapshot)) ; Re-snapshot so snapshot stays immutable.
+        [recycled-smas reborn-smas] (ago-judge-state-machines (:bufs ss)
+                                                              (:smas ss)
+                                                              (:smas @ago-world))
+        [recycled-smasN reborn-smasN] (ago-judge-state-machines (:bufs ss)
+                                                                (:smas-new ss)
+                                                                (:smas-new @ago-world))
+        branch-id (- ((:gen-id @ago-world)))] ; Negative in case snapshot re-restored.
+    (swap! ago-world #(-> %
+                          (assoc :seqv (conj (:seqv ss) branch-id 0))
+                          (assoc :bufs (:bufs ss))
+                          (assoc :smas recycled-smas)
+                          (assoc :smas-new recycled-smasN)
+                          (assoc :closed (:closed ss))
+                          (assoc :logical-ms (:logical-ms ss))
+                          (assoc :physical-ms (now))
+                          (assoc :timeouts (:timeouts ss))
+                          (assoc :latches (:latches ss))))
+    (doseq [[sma-old ss-buf-id] reborn-smas]
+      (ago-revive-state-machine ago-world sma-old ss-buf-id))
+    (doseq [[sma-old ss-buf-id] reborn-smasN]
+      (ago-revive-state-machine ago-world sma-old ss-buf-id))
+    (when (seq (:timeouts @ago-world))
+      (timeout-handler ago-world))
+    ago-world))
