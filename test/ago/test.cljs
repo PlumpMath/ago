@@ -530,22 +530,33 @@
           (>! cc1 true)
           (assert (= (<! ch1) 1))
 
-          (close! cc0) ; Now close the channels.
-          (close! cc1)
-          (assert (= (<! ch0) nil))
-          (assert (= (<! ch1) nil))
+          (let [ss2 (ago-snapshot agw)]
+            (close! cc0) ; Now close the channels.
+            (close! cc1)
+            (assert (= (<! ch0) nil))
+            (assert (= (<! ch1) nil))
 
-          (ago-restore agw ss) ; Restore after channel closures.
-          (>! cc0 true)
-          (assert (= (<! ch0) 2))
-          (>! cc1 true)
-          (assert (= (<! ch1) 1))
-          (close! cc0)
-          (close! cc1)
-          (assert (= (<! ch0) nil))
-          (assert (= (<! ch1) nil))
+            (ago-restore agw ss) ; Restore after channel closures.
+            (>! cc0 true)
+            (assert (= (<! ch0) 2))
+            (>! cc1 true)
+            (assert (= (<! ch1) 1))
+            (close! cc0)
+            (close! cc1)
+            (assert (= (<! ch0) nil))
+            (assert (= (<! ch1) nil))
 
-          (reset! all-done true)))
+            (ago-restore agw ss2) ; Restore something ss2, or a future snapshot.
+            (>! cc0 true)
+            (assert (= (<! ch0) 5))
+            (>! cc0 true)
+            (assert (= (<! ch0) 6))
+            (>! cc0 true)
+            (assert (= (<! ch0) 7))
+            (>! cc1 true)
+            (assert (= (<! ch1) 2))
+
+            (reset! all-done true))))
     (loop []
       (when (not @all-done)
         (cljs.core.async.impl.dispatch/process-messages)
