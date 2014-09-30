@@ -179,7 +179,7 @@ the state machine arrays of each "go routine".  With those hooks the
 ago library can then register those state machine arrays into its
 world-handle.
 
-A world-handle is a just an atom to an immutable/persistent
+A world-handle is just an atom to an immutable/persistent
 associative hash-map that holds onto those state machine arrays
 and other stuff.
 
